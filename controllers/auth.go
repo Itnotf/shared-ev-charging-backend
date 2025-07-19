@@ -34,9 +34,11 @@ type WechatLoginResponse struct {
 func WechatLogin(c *gin.Context) {
 	var req WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.WarnCtx(c, "微信登录参数校验失败: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误", "error": err.Error()})
 		return
 	}
+	utils.InfoCtx(c, "微信登录请求: code=%s, hasPhoneCode=%t", req.Code, req.PhoneCode != "")
 	cfg := config.GetConfig()
 	wc := wechat.NewWechat()
 	memory := cache.NewMemory()
@@ -47,10 +49,12 @@ func WechatLogin(c *gin.Context) {
 	})
 	authResult, err := miniprogram.GetAuth().Code2Session(req.Code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "微信登录失败", "error": err.Error()})
+		utils.ErrorCtx(c, "微信登录失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "微信登录失败"})
 		return
 	}
 	if authResult.ErrCode != 0 {
+		utils.WarnCtx(c, "微信登录API错误: %s", authResult.ErrMsg)
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "微信登录失败", "error": authResult.ErrMsg})
 		return
 	}
@@ -67,6 +71,7 @@ func WechatLogin(c *gin.Context) {
 	}
 	user, err := service.GetUserByOpenID(authResult.OpenID)
 	if err != nil {
+		utils.InfoCtx(c, "创建新用户: openid=%s", authResult.OpenID)
 		userToCreate := service.UserCreateInput{
 			OpenID: authResult.OpenID,
 			Name:   "用户" + authResult.OpenID[len(authResult.OpenID)-6:],
@@ -76,14 +81,17 @@ func WechatLogin(c *gin.Context) {
 		}
 		user, err = service.CreateUserWithInput(userToCreate)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建用户失败", "error": err.Error()})
+			utils.ErrorCtx(c, "创建用户失败: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建用户失败"})
 			return
 		}
+		utils.InfoCtx(c, "新用户创建成功: user_id=%d", user.ID)
 	} else if phone != "" && user.Phone == "" {
+		utils.InfoCtx(c, "更新用户手机号: user_id=%d", user.ID)
 		// 如果用户已存在但没有手机号，且本次获取到了手机号，则更新手机号
-		user.Phone = phone
-		err := service.UpdateUserPhoneByID(user.ID, phone)
+		err := service.UpdateUserPhoneByID(c, user.ID, phone)
 		if err != nil {
+			utils.ErrorCtx(c, "更新用户手机号失败: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新用户手机号失败", "error": err.Error()})
 			return
 		}
@@ -91,9 +99,11 @@ func WechatLogin(c *gin.Context) {
 	formattedUser := user.FormatUserInfo()
 	token, err := utils.GenerateToken(formattedUser)
 	if err != nil {
+		utils.ErrorCtx(c, "生成令牌失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "生成令牌失败", "error": err.Error()})
 		return
 	}
+	utils.InfoCtx(c, "用户登录成功: user_id=%d", user.ID)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "登录成功", "data": WechatLoginResponse{Token: token, UserInfo: formattedUser}})
 }
 
@@ -107,21 +117,26 @@ func WechatLogin(c *gin.Context) {
 // @Success 200 {object} gin.H{"code":200,"message":"令牌刷新成功","data":{}}
 // @Router /auth/refresh [post]
 func RefreshToken(c *gin.Context) {
+	utils.InfoCtx(c, "刷新令牌请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "刷新令牌未认证")
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
-	userData, err := service.GetUserByID(userModel.ID)
+	userData, err := service.GetUserByID(c, userModel.ID)
 	if err != nil {
+		utils.ErrorCtx(c, "刷新令牌获取用户信息失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户信息失败", "error": err.Error()})
 		return
 	}
 	formattedUser := userData.FormatUserInfo()
 	token, err := utils.GenerateToken(formattedUser)
 	if err != nil {
+		utils.ErrorCtx(c, "刷新令牌生成失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "生成令牌失败", "error": err.Error()})
 		return
 	}
+	utils.InfoCtx(c, "令牌刷新成功: user_id=%d", userData.ID)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "令牌刷新成功", "data": gin.H{"token": token, "user_info": formattedUser}})
 }

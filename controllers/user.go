@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"shared-charge/config"
 	"shared-charge/service"
 	"shared-charge/utils"
 
@@ -18,18 +19,21 @@ import (
 // @Success 200 {object} models.User
 // @Router /users/profile [get]
 func GetUserProfile(c *gin.Context) {
+	utils.InfoCtx(c, "获取用户信息请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "获取用户信息未认证")
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 
-	userData, err := service.GetUserByID(userModel.ID)
+	userData, err := service.GetUserByID(c, userModel.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户信息失败", "error": err.Error()})
+		utils.ErrorCtx(c, "获取用户信息失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户信息失败"})
 		return
 	}
-
+	utils.InfoCtx(c, "获取用户信息成功: user_id=%d", userModel.ID)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取用户信息成功", "data": userData.FormatUserInfo()})
 }
 
@@ -43,20 +47,19 @@ func GetUserProfile(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /users/price [get]
 func GetUserPrice(c *gin.Context) {
+	utils.InfoCtx(c, "获取用户电价请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "获取用户电价未认证")
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
-
-	userData, err := service.GetUserByID(userModel.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户电价失败", "error": err.Error()})
-		return
+	unitPrice := userModel.UnitPrice
+	if unitPrice <= 0 {
+		unitPrice = config.GetConfig().App.DefaultUnitPrice
 	}
-
-	price := userData.UnitPrice
-	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取用户电价成功", "data": gin.H{"unit_price": price}})
+	utils.InfoCtx(c, "获取用户电价成功: user_id=%d, price=%v", userModel.ID, unitPrice)
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取用户电价成功", "data": gin.H{"unit_price": unitPrice}})
 }
 
 // UpdateUserProfile 更新用户信息
@@ -70,27 +73,33 @@ func GetUserPrice(c *gin.Context) {
 // @Success 200 {object} gin.H{"code": 200, "message": "更新成功"}
 // @Router /users/profile [post]
 func UpdateUserProfile(c *gin.Context) {
+	utils.InfoCtx(c, "更新用户信息请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "更新用户信息未认证")
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
-
 	var req struct {
-		NickName string `json:"nick_name"`
-		Avatar   string `json:"avatar"`
+		NickName  string `json:"nickName"`
+		AvatarUrl string `json:"avatarUrl"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误", "error": err.Error()})
+		utils.WarnCtx(c, "更新用户信息参数校验失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误"})
 		return
 	}
-
-	if err := service.UpdateUserProfile(userModel.ID, req.Avatar, req.NickName); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新用户信息失败", "error": err.Error()})
+	if req.NickName == "" && req.AvatarUrl == "" {
+		utils.WarnCtx(c, "更新用户信息参数为空")
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "昵称和头像不能都为空"})
 		return
 	}
-
+	if err := service.UpdateUserProfile(c, userModel.ID, req.AvatarUrl, req.NickName); err != nil {
+		utils.ErrorCtx(c, "更新用户信息失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新用户信息失败"})
+		return
+	}
+	utils.InfoCtx(c, "用户信息更新成功: user_id=%d", userModel.ID)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "用户信息更新成功"})
 }
 

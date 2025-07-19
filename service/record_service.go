@@ -2,8 +2,11 @@ package service
 
 import (
 	"shared-charge/models"
+	"shared-charge/utils"
 	"sort"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 const defaultLimit = 50
@@ -47,9 +50,11 @@ type CreateRecordRequest struct {
 	Timeslot      string
 }
 
-func CreateRecordWithTimeslot(req CreateRecordRequest) error {
+func CreateRecordWithTimeslot(c *gin.Context, req CreateRecordRequest) error {
+	utils.InfoCtx(c, "创建充电记录: user_id=%d, date=%s, kwh=%v, reservation_id=%d, image_url=%s", req.UserID, req.Date, req.KWH, req.ReservationID, req.ImageURL)
 	date, err := time.ParseInLocation("2006-01-02", req.Date, time.Local)
 	if err != nil {
+		utils.WarnCtx(c, "创建充电记录日期格式错误: %v", err)
 		return err
 	}
 	timeslot := req.Timeslot
@@ -58,6 +63,8 @@ func CreateRecordWithTimeslot(req CreateRecordRequest) error {
 		err := models.DB.Select("timeslot").First(&reservation, req.ReservationID).Error
 		if err == nil {
 			timeslot = reservation.Timeslot
+		} else {
+			utils.WarnCtx(c, "查找预约时段失败: reservation_id=%d, err=%v", req.ReservationID, err)
 		}
 	}
 	record := &models.Record{
@@ -70,8 +77,23 @@ func CreateRecordWithTimeslot(req CreateRecordRequest) error {
 		ReservationID: req.ReservationID,
 		Timeslot:      timeslot,
 	}
+	utils.InfoCtx(c, "即将写入数据库的 record.ImageURL=%s", record.ImageURL)
 	record.CalculateAmount()
-	return models.DB.Create(record).Error
+	errCreate := models.DB.Create(record).Error
+	if errCreate != nil {
+		utils.ErrorCtx(c, "充电记录入库失败: %v", errCreate)
+		return errCreate
+	}
+	utils.InfoCtx(c, "充电记录创建成功: user_id=%d, record_id=%d, image_url=%s", req.UserID, record.ID, record.ImageURL)
+	// 新增：自动将预约状态设为 completed
+	if req.ReservationID != 0 {
+		if err := SetReservationCompleted(req.ReservationID, req.UserID); err != nil {
+			utils.WarnCtx(c, "设置预约完成状态失败: reservation_id=%d, user_id=%d, err=%v", req.ReservationID, req.UserID, err)
+		} else {
+			utils.InfoCtx(c, "预约状态已设为 completed: reservation_id=%d, user_id=%d", req.ReservationID, req.UserID)
+		}
+	}
+	return nil
 }
 
 // 获取未提交的充电记录
@@ -164,13 +186,15 @@ func GetMonthlyShiftStatistics(userID uint, month string) (float64, float64, flo
 }
 
 // 获取用户最近N条充电记录（带timeslot）
-func GetRecentRecordsWithTimeslotByUser(userID uint, limit int) ([]map[string]interface{}, error) {
+func GetRecentRecordsWithTimeslotByUser(c *gin.Context, userID uint, limit int) ([]map[string]interface{}, error) {
+	utils.InfoCtx(c, "查询用户充电记录: user_id=%d, limit=%d", userID, limit)
 	if limit <= 0 {
 		limit = defaultLimit
 	}
 	var records []models.Record
 	err := models.DB.Where("user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&records).Error
 	if err != nil {
+		utils.ErrorCtx(c, "查询用户充电记录失败: %v", err)
 		return nil, err
 	}
 	// 批量查找所有涉及的预约ID
@@ -207,6 +231,7 @@ func GetRecentRecordsWithTimeslotByUser(userID uint, limit int) ([]map[string]in
 			"timeslot": timeslot,
 		})
 	}
+	utils.InfoCtx(c, "查询用户充电记录成功: user_id=%d, count=%d", userID, len(records))
 	return resp, nil
 }
 

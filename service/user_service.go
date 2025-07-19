@@ -3,12 +3,19 @@ package service
 import (
 	"shared-charge/config"
 	"shared-charge/models"
+	"shared-charge/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
 // 获取用户信息
-func GetUserByID(id uint) (models.User, error) {
+func GetUserByID(c *gin.Context, id uint) (models.User, error) {
+	utils.InfoCtx(c, "查询用户信息: user_id=%d", id)
 	var user models.User
 	err := models.DB.First(&user, id).Error
+	if err != nil {
+		utils.ErrorCtx(c, "查询用户信息失败: %v", err)
+	}
 	return user, err
 }
 
@@ -31,14 +38,24 @@ func GetUserPrice(userID uint) (float64, error) {
 }
 
 // UpdateUserProfile 更新用户信息（修复函数签名）
-func UpdateUserProfile(userID uint, avatar string, nickName string) error {
-	return models.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
-		"avatar":   avatar,
-		"nickname": nickName,
+func UpdateUserProfile(c *gin.Context, userID uint, avatar string, nickName string) error {
+	utils.InfoCtx(c, "更新用户信息: user_id=%d", userID)
+	err := models.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"avatar": avatar,
+		"name":   nickName, // 修正为 name
 	}).Error
+	if err != nil {
+		utils.ErrorCtx(c, "更新用户信息失败: %v", err)
+	}
+	return err
 }
 
 // UpdateUserPhoneByID 更新用户手机号
-func UpdateUserPhoneByID(userID uint, phone string) error {
-	return models.DB.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone).Error
+func UpdateUserPhoneByID(c *gin.Context, userID uint, phone string) error {
+	utils.InfoCtx(c, "更新用户手机号: user_id=%d", userID)
+	err := models.DB.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone).Error
+	if err != nil {
+		utils.ErrorCtx(c, "更新用户手机号失败: %v", err)
+	}
+	return err
 }

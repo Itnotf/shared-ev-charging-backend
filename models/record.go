@@ -15,7 +15,7 @@ type Record struct {
 	KWH           float64        `json:"kwh" gorm:"not null;comment:充电度数(kWh)"`
 	Amount        int64          `json:"amount" gorm:"not null;comment:费用金额(分)"`
 	UnitPrice     float64        `json:"unit_price" gorm:"not null;comment:单价"`
-	ImageURL      string         `json:"image_url" gorm:"size:255;comment:电量截图URL"`
+	ImageURL      string         `json:"image_url" gorm:"column:image_url;size:255;comment:电量截图URL"`
 	Remark        string         `json:"remark" gorm:"size:255;comment:备注"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`

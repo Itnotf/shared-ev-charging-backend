@@ -3,11 +3,15 @@ package service
 import (
 	"errors"
 	"shared-charge/models"
+	"shared-charge/utils"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
 // 获取用户预约列表（可按日期筛选）
-func GetReservationsByUser(userID uint, date string) ([]models.Reservation, error) {
+func GetReservationsByUser(c *gin.Context, userID uint, date string) ([]models.Reservation, error) {
+	utils.InfoCtx(c, "查询用户预约列表: user_id=%d, date=%s", userID, date)
 	var reservations []models.Reservation
 	query := models.DB.Where("user_id = ?", userID)
 	if date != "" {
@@ -18,15 +22,20 @@ func GetReservationsByUser(userID uint, date string) ([]models.Reservation, erro
 		}
 	}
 	err := query.Order("date DESC, created_at DESC").Find(&reservations).Error
+	if err != nil {
+		utils.ErrorCtx(c, "查询用户预约列表失败: %v", err)
+	}
 	return reservations, err
 }
 
 // 创建预约并做业务校验
-func CreateReservationWithCheck(userID uint, date time.Time, timeslot, remark string) (models.Reservation, error) {
+func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, timeslot, remark string) (models.Reservation, error) {
+	utils.InfoCtx(c, "创建预约业务校验: user_id=%d, date=%s, timeslot=%s", userID, date.Format("2006-01-02"), timeslot)
 	// 检查是否有未完成预约
 	var ongoing models.Reservation
 	err := models.DB.Where("user_id = ? AND status = ? AND date >= ?", userID, "pending", time.Now().Format("2006-01-02")).First(&ongoing).Error
 	if err == nil {
+		utils.WarnCtx(c, "有未结束预约，不能重复预约: user_id=%d", userID)
 		return models.Reservation{}, errors.New("您有未结束的预约，不能重复预约")
 	}
 
@@ -46,6 +55,7 @@ func CreateReservationWithCheck(userID uint, date time.Time, timeslot, remark st
 			var count int64
 			models.DB.Model(&models.Record{}).Where("user_id = ? AND reservation_id = ?", userID, lastReservation.ID).Count(&count)
 			if count == 0 {
+				utils.WarnCtx(c, "上次预约未上传充电记录: user_id=%d, last_reservation_id=%d", userID, lastReservation.ID)
 				return models.Reservation{}, errors.New("上一次预约已结束但未上传充电记录，请先上传记录")
 			}
 		}
@@ -59,24 +69,33 @@ func CreateReservationWithCheck(userID uint, date time.Time, timeslot, remark st
 		Remark:   remark,
 	}
 	if err := models.DB.Create(&reservation).Error; err != nil {
+		utils.ErrorCtx(c, "创建预约入库失败: %v", err)
 		return models.Reservation{}, err
 	}
 	models.DB.Preload("User").First(&reservation, reservation.ID)
+	utils.InfoCtx(c, "预约创建成功: user_id=%d, reservation_id=%d", userID, reservation.ID)
 	return reservation, nil
 }
 
 // 取消预约
-func CancelReservation(id, userID uint) error {
+func CancelReservation(c *gin.Context, id, userID uint) error {
+	utils.InfoCtx(c, "取消预约: user_id=%d, reservation_id=%d", userID, id)
 	var reservation models.Reservation
 	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&reservation).Error; err != nil {
+		utils.ErrorCtx(c, "取消预约查找失败: %v", err)
 		return err
 	}
 	reservation.Status = "cancelled"
-	return models.DB.Save(&reservation).Error
+	err := models.DB.Save(&reservation).Error
+	if err != nil {
+		utils.ErrorCtx(c, "取消预约保存失败: %v", err)
+	}
+	return err
 }
 
 // 获取当前预约及充电记录状态
-func GetCurrentReservationStatus(userID uint) (map[string]interface{}, error) {
+func GetCurrentReservationStatus(c *gin.Context, userID uint) (map[string]interface{}, error) {
+	utils.InfoCtx(c, "查询当前预约状态: user_id=%d", userID)
 	var currentRes *models.Reservation
 	var lastRes *models.Reservation
 	needUploadRecord := false
@@ -148,7 +167,7 @@ func CreateReservation(userID uint, date string, timeslot string) (*models.Reser
 		return nil, err
 	}
 
-	reservation, err := CreateReservationWithCheck(userID, parsedDate, timeslot, "")
+	reservation, err := CreateReservationWithCheck(nil, userID, parsedDate, timeslot, "") // Pass nil for gin.Context
 	if err != nil {
 		return nil, err
 	}
@@ -162,14 +181,19 @@ func DeleteReservation(id, userID uint) error {
 }
 
 // 获取当前预约
-func GetCurrentReservation(userID uint) (models.Reservation, error) {
+func GetCurrentReservation(c *gin.Context, userID uint) (models.Reservation, error) {
+	utils.InfoCtx(c, "查询当前预约: user_id=%d", userID)
 	var reservation models.Reservation
 	err := models.DB.Where("user_id = ? AND status != ? AND date >= ?", userID, "cancelled", time.Now().Format("2006-01-02")).Order("date ASC").First(&reservation).Error
+	if err != nil {
+		utils.WarnCtx(c, "查询当前预约失败: %v", err)
+	}
 	return reservation, err
 }
 
 // 获取所有未取消的预约（可按日期筛选）
-func GetReservations(date string) ([]models.Reservation, error) {
+func GetReservations(c *gin.Context, date string) ([]models.Reservation, error) {
+	utils.InfoCtx(c, "查询预约列表: date=%s", date)
 	var reservations []models.Reservation
 	query := models.DB.Where("status != ?", "cancelled")
 	if date != "" {
@@ -180,15 +204,18 @@ func GetReservations(date string) ([]models.Reservation, error) {
 		}
 	}
 	err := query.Preload("User").Order("date DESC, created_at DESC").Find(&reservations).Error
+	if err != nil {
+		utils.ErrorCtx(c, "查询预约列表失败: %v", err)
+	}
 	return reservations, err
 }
 
 // GetReservationsByDate 根据日期获取预约列表
 func GetReservationsByDate(date string) ([]models.Reservation, error) {
-	return GetReservations(date)
+	return GetReservations(nil, date) // Pass nil for gin.Context
 }
 
 // GetCurrentStatus 获取当前状态
 func GetCurrentStatus(userID uint) (map[string]interface{}, error) {
-	return GetCurrentReservationStatus(userID)
+	return GetCurrentReservationStatus(nil, userID) // Pass nil for gin.Context
 }

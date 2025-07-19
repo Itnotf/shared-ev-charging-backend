@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"shared-charge/service"
 
+	"shared-charge/config"
 	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
@@ -30,15 +31,20 @@ type CreateRecordRequest struct {
 // @Success 200 {array} models.Record
 // @Router /records [get]
 func GetRecords(c *gin.Context) {
+	utils.InfoCtx(c, "获取充电记录列表请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "获取充电记录未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
-	records, err := service.GetRecentRecordsWithTimeslotByUser(userModel.ID, 50)
+	records, err := service.GetRecentRecordsWithTimeslotByUser(c, userModel.ID, 50)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取充电记录失败", "error": err.Error()})
+		utils.ErrorCtx(c, "获取充电记录失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取充电记录失败"})
 		return
 	}
+	utils.InfoCtx(c, "获取充电记录成功: user_id=%d, count=%d", userModel.ID, len(records))
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取充电记录成功", "data": records})
 }
 
@@ -53,18 +59,27 @@ func GetRecords(c *gin.Context) {
 // @Success 200 {object} models.Record
 // @Router /records [post]
 func CreateRecord(c *gin.Context) {
+	utils.InfoCtx(c, "创建充电记录请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "创建充电记录未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 	var req CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.WarnCtx(c, "创建充电记录参数校验失败: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误", "error": err.Error()})
 		return
 	}
 	if req.ReservationID == 0 {
+		utils.WarnCtx(c, "创建充电记录缺少预约ID")
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "缺少预约ID"})
 		return
+	}
+	unitPrice := userModel.UnitPrice
+	if unitPrice <= 0 {
+		unitPrice = config.GetConfig().App.DefaultUnitPrice
 	}
 	createReq := service.CreateRecordRequest{
 		UserID:        userModel.ID,
@@ -72,11 +87,16 @@ func CreateRecord(c *gin.Context) {
 		KWH:           req.KWH,
 		ReservationID: req.ReservationID,
 		Timeslot:      req.Timeslot,
+		UnitPrice:     unitPrice,
+		ImageURL:      req.ImageURL, // 修复：传递 image_url
+		Remark:        req.Remark,   // 修复：传递 remark
 	}
-	if err := service.CreateRecordWithTimeslot(createReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "创建充电记录失败", "error": err.Error()})
+	if err := service.CreateRecordWithTimeslot(c, createReq); err != nil {
+		utils.ErrorCtx(c, "创建充电记录失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "创建充电记录失败"})
 		return
 	}
+	utils.InfoCtx(c, "充电记录创建成功: user_id=%d, reservation_id=%d", userModel.ID, req.ReservationID)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "充电记录创建成功"})
 }
 
@@ -90,15 +110,20 @@ func CreateRecord(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /records/unsubmitted [get]
 func GetUnsubmittedRecords(c *gin.Context) {
+	utils.InfoCtx(c, "获取未提交充电记录请求")
 	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
+		utils.WarnCtx(c, "获取未提交充电记录未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 	records, err := service.GetUnsubmittedRecords(userModel.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取未提交充电记录失败", "error": err.Error()})
+		utils.ErrorCtx(c, "获取未提交充电记录失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取未提交充电记录失败"})
 		return
 	}
+	utils.InfoCtx(c, "获取未提交充电记录成功: user_id=%d, count=%d", userModel.ID, len(records))
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取未提交充电记录成功", "data": records})
 }
 

@@ -9,7 +9,7 @@ import (
 // User 用户模型
 type User struct {
 	ID        uint           `json:"id" gorm:"primaryKey"`
-	OpenID    string         `json:"openid" gorm:"uniqueIndex;not null"`
+	OpenID    string         `json:"openid" gorm:"column:openid;uniqueIndex;not null"`
 	Name      string         `json:"name" gorm:"not null"`
 	Phone     string         `json:"phone"`
 	Avatar    string         `json:"avatar"`
