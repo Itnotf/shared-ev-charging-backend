@@ -17,7 +17,7 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Param file formData file true "图片文件"
-// @Success 200 {object} gin.H{"code":200,"message":"图片上传成功","data":{}}
+// @Success 200 {object} map[string]interface{}
 // @Router /upload/image [post]
 func UploadImage(c *gin.Context) {
 	utils.InfoCtx(c, "上传图片请求")

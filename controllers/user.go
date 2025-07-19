@@ -16,7 +16,7 @@ import (
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} models.User
+// @Success 200 {object} map[string]interface{}
 // @Router /users/profile [get]
 func GetUserProfile(c *gin.Context) {
 	utils.InfoCtx(c, "获取用户信息请求")
@@ -70,7 +70,7 @@ func GetUserPrice(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body UpdateUserProfileRequest true "用户信息更新请求"
-// @Success 200 {object} gin.H{"code": 200, "message": "更新成功"}
+// @Success 200 {object} map[string]interface{}
 // @Router /users/profile [post]
 func UpdateUserProfile(c *gin.Context) {
 	utils.InfoCtx(c, "更新用户信息请求")

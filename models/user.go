@@ -18,7 +18,7 @@ type User struct {
 	UnitPrice float64        `json:"unit_price" gorm:"default:0.7"`
 	CreatedAt time.Time      `json:"created_at"`
 	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" swaggerignore:"true"`
 }
 
 // TableName 指定表名

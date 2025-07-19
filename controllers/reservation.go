@@ -26,7 +26,7 @@ type CreateReservationRequest struct {
 // @Produce json
 // @Security BearerAuth
 // @Param date query string false "预约日期(YYYY-MM-DD)"
-// @Success 200 {object} gin.H{"code":200,"message":"获取预约列表成功","data":[]}
+// @Success 200 {object} map[string]interface{}
 // @Router /reservations [get]
 func GetReservations(c *gin.Context) {
 	utils.InfoCtx(c, "获取预约列表请求: date=%s", c.Query("date"))
@@ -56,7 +56,7 @@ func GetReservations(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param request body CreateReservationRequest true "预约请求体"
-// @Success 200 {object} gin.H{"code":200,"message":"预约创建成功","data":{}}
+// @Success 200 {object} map[string]interface{}
 // @Router /reservations [post]
 func CreateReservation(c *gin.Context) {
 	utils.InfoCtx(c, "创建预约请求")
@@ -96,7 +96,7 @@ func CreateReservation(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "预约ID"
-// @Success 200 {object} gin.H{"code":200,"message":"预约取消成功"}
+// @Success 200 {object} map[string]interface{}
 // @Router /reservations/{id} [delete]
 func DeleteReservation(c *gin.Context) {
 	utils.InfoCtx(c, "取消预约请求: id=%s", c.Param("id"))
@@ -129,7 +129,7 @@ func DeleteReservation(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H{"code":200,"message":"获取当前预约成功","data":{}}
+// @Success 200 {object} map[string]interface{}
 // @Router /reservations/current [get]
 func GetCurrentReservation(c *gin.Context) {
 	utils.InfoCtx(c, "获取当前预约请求")
@@ -156,7 +156,7 @@ func GetCurrentReservation(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H{"code":200,"message":"获取当前状态成功","data":{}}
+// @Success 200 {object} map[string]interface{}
 // @Router /reservations/current-status [get]
 func GetCurrentStatus(c *gin.Context) {
 	utils.InfoCtx(c, "获取当前状态请求")

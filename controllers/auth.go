@@ -29,7 +29,7 @@ type WechatLoginResponse struct {
 // @Accept json
 // @Produce json
 // @Param request body WechatLoginRequest true "微信登录请求体"
-// @Success 200 {object} WechatLoginResponse
+// @Success 200 {object} controllers.WechatLoginResponse
 // @Router /auth/login [post]
 func WechatLogin(c *gin.Context) {
 	var req WechatLoginRequest
@@ -114,7 +114,7 @@ func WechatLogin(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} gin.H{"code":200,"message":"令牌刷新成功","data":{}}
+// @Success 200 {object} map[string]interface{}
 // @Router /auth/refresh [post]
 func RefreshToken(c *gin.Context) {
 	utils.InfoCtx(c, "刷新令牌请求")

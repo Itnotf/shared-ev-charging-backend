@@ -7,6 +7,8 @@ import (
 	"shared-charge/models"
 	"shared-charge/utils"
 
+	_ "shared-charge/docs"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
