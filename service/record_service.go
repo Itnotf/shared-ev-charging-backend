@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"shared-charge/models"
 	"shared-charge/utils"
 	"sort"
@@ -65,6 +66,25 @@ func CreateRecordWithTimeslot(c *gin.Context, req CreateRecordRequest) error {
 			timeslot = reservation.Timeslot
 		} else {
 			utils.WarnCtx(c, "查找预约时段失败: reservation_id=%d, err=%v", req.ReservationID, err)
+		}
+	}
+	// 新增：校验预约必须为pending状态，且一个预约只能有一条record
+	if req.ReservationID != 0 {
+		var reservation models.Reservation
+		errRes := models.DB.First(&reservation, req.ReservationID).Error
+		if errRes != nil {
+			utils.WarnCtx(c, "预约不存在: reservation_id=%d", req.ReservationID)
+			return errRes
+		}
+		if reservation.Status != "pending" {
+			utils.WarnCtx(c, "预约状态不是pending: reservation_id=%d, status=%s", req.ReservationID, reservation.Status)
+			return errors.New("预约状态必须为pending")
+		}
+		var count int64
+		models.DB.Model(&models.Record{}).Where("reservation_id = ?", req.ReservationID).Count(&count)
+		if count > 0 {
+			utils.WarnCtx(c, "该预约已上传过充电记录: reservation_id=%d", req.ReservationID)
+			return errors.New("一个预约只能上传一条充电记录")
 		}
 	}
 	record := &models.Record{

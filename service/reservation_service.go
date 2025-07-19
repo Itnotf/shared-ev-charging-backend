@@ -61,6 +61,16 @@ func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, tim
 		}
 	}
 
+	// 新增：同一天同一时段只能有一条有效预约（不含cancelled）
+	var dupCount int64
+	errDup := models.DB.Model(&models.Reservation{}).
+		Where("user_id = ? AND date = ? AND timeslot = ? AND status != ?", userID, date, timeslot, "cancelled").
+		Count(&dupCount).Error
+	if errDup == nil && dupCount > 0 {
+		utils.WarnCtx(c, "同一天同一时段已有预约: user_id=%d, date=%s, timeslot=%s", userID, date.Format("2006-01-02"), timeslot)
+		return models.Reservation{}, errors.New("同一天同一时段只能有一条有效预约")
+	}
+
 	reservation := models.Reservation{
 		UserID:   userID,
 		Date:     date,
