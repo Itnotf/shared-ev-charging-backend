@@ -1,0 +1,60 @@
+# Go build
+/bin/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.cov
+
+# Dependency directories (remove the comment below if you use Go modules)
+/vendor/
+
+# IDE/editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads
+/uploads/
+
+# Swagger docs (if generated)
+docs/
+
+# Env
+.env
+.env.*
+
+# Migration binaries
+migrate
+migrate.exe
+
+# Shell history
+*.history
+
+# PowerShell temp
+*.ps1~
+
+# Node/npm (if accidentally added)
+node_modules/
+package-lock.json 

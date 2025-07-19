@@ -1,0 +1,35 @@
+# air.toml 示例，适用于 Gin+Go 项目
+# 文档: https://github.com/air-verse/air
+
+[build]
+  # 监控哪些文件变动会触发重启
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  exclude_dir = ["vendor", "docs", "test", "tests", "frontend", "my-project"]
+  exclude_file = []
+  follow_symlink = false
+  # 编译命令
+  cmd = "go build -o ./tmp/main.exe ."
+  bin = "./tmp/main.exe"
+  full_bin = ""
+  log = "build.log"
+  delay = 1000 # ms
+  stop_on_error = true
+
+[run]
+  cmd = ""
+  args = []
+  env = ["GIN_MODE=debug"]
+  env_file = ".env"
+  # 监听的端口
+  port = 8080
+  watch_dir = "."
+  watch_delay = 1000 # ms
+
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"
+
+[log]
+  time = true 

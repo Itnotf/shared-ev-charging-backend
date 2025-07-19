@@ -1,0 +1,1 @@
+ALTER TABLE records ADD COLUMN IF NOT EXISTS timeslot VARCHAR(20) /* 班次:day,night */; 
