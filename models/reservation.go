@@ -66,6 +66,7 @@ func (r *Reservation) FormatReservationInfo() map[string]interface{} {
 		"remark":        r.Remark,
 		"created_at":    r.CreatedAt,
 		"updated_at":    r.UpdatedAt,
-		"user":          r.User.FormatUserInfo(),
+		"user_name":     r.User.Name,
+		"user_avatar":   r.User.Avatar,
 	}
 }
