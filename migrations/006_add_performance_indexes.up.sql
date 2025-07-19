@@ -11,7 +11,7 @@ CREATE INDEX IF NOT EXISTS idx_reservations_timeslot ON reservations(timeslot);
 CREATE INDEX IF NOT EXISTS idx_reservations_status ON reservations(status);
 
 -- 用户表索引
-CREATE INDEX IF NOT EXISTS idx_users_openid ON users(open_id);
+CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid);
 CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
 
 -- 复合索引优化
