@@ -2,10 +2,11 @@ package controllers
 
 import (
 	"net/http"
-	"shared-charge/models"
 	"shared-charge/service"
 	"strconv"
 	"time"
+
+	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,15 @@ type CreateReservationRequest struct {
 }
 
 // GetReservations 获取预约列表
+// @Summary 获取预约列表
+// @Description 获取指定日期的所有预约（不传date则为当天）
+// @Tags 预约
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param date query string false "预约日期(YYYY-MM-DD)"
+// @Success 200 {object} gin.H{"code":200,"message":"获取预约列表成功","data":[]}
+// @Router /reservations [get]
 func GetReservations(c *gin.Context) {
 	date := c.Query("date")
 	if date == "" {
@@ -39,14 +49,17 @@ func GetReservations(c *gin.Context) {
 }
 
 // CreateReservation 创建预约
+// @Summary 创建预约
+// @Description 创建新的预约
+// @Tags 预约
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body CreateReservationRequest true "预约请求体"
+// @Success 200 {object} gin.H{"code":200,"message":"预约创建成功","data":{}}
+// @Router /reservations [post]
 func CreateReservation(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
@@ -58,7 +71,7 @@ func CreateReservation(c *gin.Context) {
 		return
 	}
 
-	date, err := time.Parse("2006-01-02", req.Date)
+	date, err := utils.ParseDate(req.Date)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "日期格式错误", "error": err.Error()})
 		return
@@ -74,16 +87,19 @@ func CreateReservation(c *gin.Context) {
 }
 
 // DeleteReservation 取消预约
+// @Summary 取消预约
+// @Description 取消指定ID的预约
+// @Tags 预约
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "预约ID"
+// @Success 200 {object} gin.H{"code":200,"message":"预约取消成功"}
+// @Router /reservations/{id} [delete]
 func DeleteReservation(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 
@@ -103,16 +119,18 @@ func DeleteReservation(c *gin.Context) {
 }
 
 // GetCurrentReservation 获取当前用户的最近未过期预约
+// @Summary 获取当前用户的最近未过期预约
+// @Description 获取当前用户的最近未过期预约信息
+// @Tags 预约
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} gin.H{"code":200,"message":"获取当前预约成功","data":{}}
+// @Router /reservations/current [get]
 func GetCurrentReservation(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 
@@ -126,16 +144,18 @@ func GetCurrentReservation(c *gin.Context) {
 }
 
 // GetCurrentStatus 获取当前预约及充电记录状态
+// @Summary 获取当前预约及充电记录状态
+// @Description 获取当前用户的预约和充电记录状态
+// @Tags 预约
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} gin.H{"code":200,"message":"获取当前状态成功","data":{}}
+// @Router /reservations/current-status [get]
 func GetCurrentStatus(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 

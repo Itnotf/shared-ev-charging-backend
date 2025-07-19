@@ -3,20 +3,24 @@ package controllers
 import (
 	"net/http"
 	"shared-charge/config"
-	"shared-charge/models"
 	"shared-charge/service"
+	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
+// UploadImage 上传图片
+// @Summary 上传图片
+// @Description 用户上传图片文件
+// @Tags 文件
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param file formData file true "图片文件"
+// @Success 200 {object} gin.H{"code":200,"message":"图片上传成功","data":{}}
+// @Router /upload/image [post]
 func UploadImage(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return

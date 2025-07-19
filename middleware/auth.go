@@ -1,12 +1,16 @@
 package middleware
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"shared-charge/config"
 	"shared-charge/models"
 	"strings"
 	"sync"
 	"time"
+
+	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -39,6 +43,27 @@ func cleanupUserCache() {
 			delete(userCache, userID)
 		}
 	}
+}
+
+// getUserFromCache 从 Redis 获取用户缓存
+func getUserFromCache(userID uint) (*models.User, bool) {
+	key := fmt.Sprintf("user_cache:%d", userID)
+	val, err := utils.GetRedis().Get(utils.RedisCtx(), key).Result()
+	if err != nil {
+		return nil, false
+	}
+	var user models.User
+	if err := json.Unmarshal([]byte(val), &user); err != nil {
+		return nil, false
+	}
+	return &user, true
+}
+
+// setUserToCache 设置用户缓存到 Redis
+func setUserToCache(user *models.User) {
+	key := fmt.Sprintf("user_cache:%d", user.ID)
+	data, _ := json.Marshal(user)
+	utils.GetRedis().Set(utils.RedisCtx(), key, data, time.Hour) // 1小时过期
 }
 
 // AuthMiddleware JWT认证中间件
@@ -104,9 +129,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 先从缓存获取用户信息
 		userIDUint := uint(userID)
-		cacheMutex.RLock()
-		if user, exists := userCache[userIDUint]; exists {
-			cacheMutex.RUnlock()
+		if user, exists := getUserFromCache(userIDUint); exists {
 			// 检查用户状态
 			if !user.IsActive() {
 				c.JSON(http.StatusForbidden, gin.H{
@@ -120,7 +143,6 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		cacheMutex.RUnlock()
 
 		// 缓存未命中，查询数据库
 		var user models.User
@@ -144,9 +166,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		// 更新缓存
-		cacheMutex.Lock()
-		userCache[userIDUint] = &user
-		cacheMutex.Unlock()
+		setUserToCache(&user)
 
 		// 将用户信息存储到上下文中
 		c.Set("user", user)

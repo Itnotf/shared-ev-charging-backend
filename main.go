@@ -48,11 +48,16 @@ func main() {
 		// 原日志打印已删除
 	}
 
+	// 初始化Redis
+	redisCfg := config.GetConfig().Redis
+	utils.InitRedis(redisCfg.Addr, redisCfg.Password, redisCfg.DB)
+
 	// 设置Gin模式
 	gin.SetMode(config.GetConfig().Server.Mode)
 
 	// 创建路由（禁用默认日志）
 	r := gin.New()
+	r.Use(middleware.ErrorHandler())          // 注册全局错误处理中间件
 	r.Use(middleware.TraceMiddleware())       // 添加trace中间件
 	r.Use(middleware.PerformanceMiddleware()) // 添加性能监控中间件
 	r.Use(middleware.CORS())

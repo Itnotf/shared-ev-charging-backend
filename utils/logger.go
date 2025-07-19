@@ -103,10 +103,22 @@ func CtxLogger(c *gin.Context) *zap.SugaredLogger {
 	return GetLogger()
 }
 
+// 尝试从 args 里提取 *gin.Context
+func extractGinContextFromArgs(args ...interface{}) (*gin.Context, bool) {
+	for _, arg := range args {
+		if c, ok := arg.(*gin.Context); ok {
+			return c, true
+		}
+	}
+	return nil, false
+}
+
 // 通用日志函数，自动判断是否带 gin.Context
 func logWithCtx(ctx interface{}, level string, msg string, args ...interface{}) {
 	var l *zap.SugaredLogger
 	if c, ok := ctx.(*gin.Context); ok && c != nil {
+		l = CtxLogger(c)
+	} else if c, ok := extractGinContextFromArgs(args...); ok && c != nil {
 		l = CtxLogger(c)
 	} else {
 		l = GetLogger()

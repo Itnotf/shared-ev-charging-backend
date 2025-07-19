@@ -1,10 +1,8 @@
 package controllers
 
 import (
-	"errors"
 	"net/http"
 	"shared-charge/config"
-	"shared-charge/models"
 	"shared-charge/service"
 	"shared-charge/utils"
 
@@ -24,6 +22,15 @@ type WechatLoginResponse struct {
 	UserInfo interface{} `json:"user_info"`
 }
 
+// WechatLogin 微信登录
+// @Summary 微信小程序登录
+// @Description 微信小程序登录，获取token和用户信息
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Param request body WechatLoginRequest true "微信登录请求体"
+// @Success 200 {object} WechatLoginResponse
+// @Router /auth/login [post]
 func WechatLogin(c *gin.Context) {
 	var req WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -40,12 +47,10 @@ func WechatLogin(c *gin.Context) {
 	})
 	authResult, err := miniprogram.GetAuth().Code2Session(req.Code)
 	if err != nil {
-		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "微信登录失败", "error": err.Error()})
 		return
 	}
 	if authResult.ErrCode != 0 {
-		c.Error(errors.New(authResult.ErrMsg))
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "微信登录失败", "error": authResult.ErrMsg})
 		return
 	}
@@ -71,47 +76,50 @@ func WechatLogin(c *gin.Context) {
 		}
 		user, err = service.CreateUserWithInput(userToCreate)
 		if err != nil {
-			c.Error(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "创建用户失败", "error": err.Error()})
 			return
 		}
 	} else if phone != "" && user.Phone == "" {
 		// 如果用户已存在但没有手机号，且本次获取到了手机号，则更新手机号
 		user.Phone = phone
-		models.DB.Save(&user)
+		err := service.UpdateUserPhoneByID(user.ID, phone)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新用户手机号失败", "error": err.Error()})
+			return
+		}
 	}
 	formattedUser := user.FormatUserInfo()
 	token, err := utils.GenerateToken(formattedUser)
 	if err != nil {
-		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "生成令牌失败", "error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "登录成功", "data": WechatLoginResponse{Token: token, UserInfo: formattedUser}})
 }
 
+// RefreshToken 刷新令牌
+// @Summary 刷新令牌
+// @Description 刷新用户token
+// @Tags 认证
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} gin.H{"code":200,"message":"令牌刷新成功","data":{}}
+// @Router /auth/refresh [post]
 func RefreshToken(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.Error(errors.New("用户信息类型错误"))
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 	userData, err := service.GetUserByID(userModel.ID)
 	if err != nil {
-		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户信息失败", "error": err.Error()})
 		return
 	}
 	formattedUser := userData.FormatUserInfo()
 	token, err := utils.GenerateToken(formattedUser)
 	if err != nil {
-		c.Error(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "生成令牌失败", "error": err.Error()})
 		return
 	}

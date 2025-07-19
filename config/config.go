@@ -16,6 +16,7 @@ type Config struct {
 	App      AppConfig
 	MinIO    MinIOConfig
 	Log      LogConfig
+	Redis    RedisConfig
 }
 
 type ServerConfig struct {
@@ -60,6 +61,12 @@ type LogConfig struct {
 	Mode     string
 	Level    string
 	FilePath string
+}
+
+type RedisConfig struct {
+	Addr     string
+	Password string
+	DB       int
 }
 
 var config *Config
@@ -109,6 +116,11 @@ func LoadConfig() {
 			Mode:     getEnv("LOG_MODE", "debug"),
 			Level:    getEnv("LOG_LEVEL", "debug"),
 			FilePath: getEnv("LOG_FILE_PATH", "./logs/app.log"),
+		},
+		Redis: RedisConfig{
+			Addr:     getEnv("REDIS_ADDR", "localhost:6379"),
+			Password: getEnv("REDIS_PASSWORD", ""),
+			DB:       getEnvAsInt("REDIS_DB", 0),
 		},
 	}
 }

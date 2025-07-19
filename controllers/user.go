@@ -2,8 +2,8 @@ package controllers
 
 import (
 	"net/http"
-	"shared-charge/models"
 	"shared-charge/service"
+	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,15 +18,9 @@ import (
 // @Success 200 {object} models.User
 // @Router /users/profile [get]
 func GetUserProfile(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 
@@ -49,15 +43,9 @@ func GetUserProfile(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /users/price [get]
 func GetUserPrice(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 
@@ -82,15 +70,9 @@ func GetUserPrice(c *gin.Context) {
 // @Success 200 {object} gin.H{"code": 200, "message": "更新成功"}
 // @Router /users/profile [post]
 func UpdateUserProfile(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
 		return
 	}
 

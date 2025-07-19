@@ -37,3 +37,8 @@ func UpdateUserProfile(userID uint, avatar string, nickName string) error {
 		"nickname": nickName,
 	}).Error
 }
+
+// UpdateUserPhoneByID 更新用户手机号
+func UpdateUserPhoneByID(userID uint, phone string) error {
+	return models.DB.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone).Error
+}

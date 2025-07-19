@@ -2,8 +2,9 @@ package controllers
 
 import (
 	"net/http"
-	"shared-charge/models"
 	"shared-charge/service"
+
+	"shared-charge/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,24 +30,15 @@ type CreateRecordRequest struct {
 // @Success 200 {array} models.Record
 // @Router /records [get]
 func GetRecords(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
-
 	records, err := service.GetRecentRecordsWithTimeslotByUser(userModel.ID, 50)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取充电记录失败", "error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "获取充电记录成功", "data": records})
 }
 
@@ -61,29 +53,19 @@ func GetRecords(c *gin.Context) {
 // @Success 200 {object} models.Record
 // @Router /records [post]
 func CreateRecord(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
-
 	var req CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误", "error": err.Error()})
 		return
 	}
-
 	if req.ReservationID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "缺少预约ID"})
 		return
 	}
-
 	createReq := service.CreateRecordRequest{
 		UserID:        userModel.ID,
 		Date:          req.Date,
@@ -91,12 +73,10 @@ func CreateRecord(c *gin.Context) {
 		ReservationID: req.ReservationID,
 		Timeslot:      req.Timeslot,
 	}
-
 	if err := service.CreateRecordWithTimeslot(createReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "创建充电记录失败", "error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "充电记录创建成功"})
 }
 
@@ -110,14 +90,8 @@ func CreateRecord(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /records/unsubmitted [get]
 func GetUnsubmittedRecords(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
-		return
-	}
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
 	records, err := service.GetUnsubmittedRecords(userModel.ID)
@@ -139,34 +113,21 @@ func GetUnsubmittedRecords(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /statistics/monthly [get]
 func GetMonthlyStatistics(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(401, gin.H{"code": 401, "message": "未认证"})
-		return
-	}
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(500, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
 	month := c.Query("month")
 	if month == "" || len(month) != 7 {
-		c.JSON(400, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
 		return
 	}
 	totalKwh, totalCost, err := service.GetMonthlyStatistics(userModel.ID, month)
 	if err != nil {
-		c.JSON(500, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{
-		"code":    200,
-		"message": "success",
-		"data": gin.H{
-			"totalKwh":  totalKwh,
-			"totalCost": totalCost,
-		},
-	})
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": gin.H{"totalKwh": totalKwh, "totalCost": totalCost}})
 }
 
 // GetDailyStatistics 日用电量统计
@@ -180,31 +141,21 @@ func GetMonthlyStatistics(c *gin.Context) {
 // @Success 200 {array} map[string]interface{}
 // @Router /statistics/daily [get]
 func GetDailyStatistics(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(401, gin.H{"code": 401, "message": "未认证"})
-		return
-	}
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(500, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
 	month := c.Query("month")
 	if month == "" || len(month) != 7 {
-		c.JSON(400, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
 		return
 	}
 	resp, err := service.GetDailyStatisticsWithShift(userModel.ID, month)
 	if err != nil {
-		c.JSON(500, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{
-		"code":    200,
-		"message": "success",
-		"data":    resp,
-	})
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": resp})
 }
 
 // GetMonthlyShiftStatistics 月度分时段统计
@@ -218,33 +169,19 @@ func GetDailyStatistics(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Router /statistics/monthly-shift [get]
 func GetMonthlyShiftStatistics(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(401, gin.H{"code": 401, "message": "未认证"})
-		return
-	}
-	userModel, ok := user.(models.User)
+	userModel, ok := utils.GetUserFromContext(c)
 	if !ok {
-		c.JSON(500, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
 	month := c.Query("month")
 	if month == "" || len(month) != 7 {
-		c.JSON(400, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数month格式错误，应为YYYY-MM"})
 		return
 	}
 	dayKwh, nightKwh, totalKwh, err := service.GetMonthlyShiftStatistics(userModel.ID, month)
 	if err != nil {
-		c.JSON(500, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "数据库查询失败", "error": err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{
-		"code":    200,
-		"message": "success",
-		"data": gin.H{
-			"dayKwh":   dayKwh,
-			"nightKwh": nightKwh,
-			"totalKwh": totalKwh,
-		},
-	})
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": gin.H{"dayKwh": dayKwh, "nightKwh": nightKwh, "totalKwh": totalKwh}})
 }
