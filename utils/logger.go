@@ -89,11 +89,6 @@ func GetLogger() *zap.SugaredLogger {
 }
 
 // 以下是便捷的日志记录函数，简化日志记录的使用
-func Debug(msg string, args ...interface{}) { logger.Debugf(msg, args...) }
-func Info(msg string, args ...interface{})  { logger.Infof(msg, args...) }
-func Warn(msg string, args ...interface{})  { logger.Warnf(msg, args...) }
-func Error(msg string, args ...interface{}) { logger.Errorf(msg, args...) }
-func Fatal(msg string, args ...interface{}) { logger.Fatalf(msg, args...) }
 
 // CtxLogger 根据 gin.Context 获取带 trace_id 的 logger
 func CtxLogger(c *gin.Context) *zap.SugaredLogger {
@@ -108,9 +103,38 @@ func CtxLogger(c *gin.Context) *zap.SugaredLogger {
 	return GetLogger()
 }
 
-// 便捷函数：带 ctx 的日志
-func DebugCtx(c *gin.Context, msg string, args ...interface{}) { CtxLogger(c).Debugf(msg, args...) }
-func InfoCtx(c *gin.Context, msg string, args ...interface{})  { CtxLogger(c).Infof(msg, args...) }
-func WarnCtx(c *gin.Context, msg string, args ...interface{})  { CtxLogger(c).Warnf(msg, args...) }
-func ErrorCtx(c *gin.Context, msg string, args ...interface{}) { CtxLogger(c).Errorf(msg, args...) }
-func FatalCtx(c *gin.Context, msg string, args ...interface{}) { CtxLogger(c).Fatalf(msg, args...) }
+// 通用日志函数，自动判断是否带 gin.Context
+func logWithCtx(ctx interface{}, level string, msg string, args ...interface{}) {
+	var l *zap.SugaredLogger
+	if c, ok := ctx.(*gin.Context); ok && c != nil {
+		l = CtxLogger(c)
+	} else {
+		l = GetLogger()
+	}
+	// 统一处理日志级别
+	switch strings.ToLower(level) {
+	case "debug":
+		l.Debugf(msg, args...)
+	case "info":
+		l.Infof(msg, args...)
+	case "warn":
+		l.Warnf(msg, args...)
+	case "error":
+		l.Errorf(msg, args...)
+	case "fatal":
+		l.Fatalf(msg, args...)
+	}
+}
+
+// 简化后的便捷日志函数
+func Debug(msg string, args ...interface{}) { logWithCtx(nil, "debug", msg, args...) }
+func Info(msg string, args ...interface{})  { logWithCtx(nil, "info", msg, args...) }
+func Warn(msg string, args ...interface{})  { logWithCtx(nil, "warn", msg, args...) }
+func Error(msg string, args ...interface{}) { logWithCtx(nil, "error", msg, args...) }
+func Fatal(msg string, args ...interface{}) { logWithCtx(nil, "fatal", msg, args...) }
+
+func DebugCtx(c *gin.Context, msg string, args ...interface{}) { logWithCtx(c, "debug", msg, args...) }
+func InfoCtx(c *gin.Context, msg string, args ...interface{})  { logWithCtx(c, "info", msg, args...) }
+func WarnCtx(c *gin.Context, msg string, args ...interface{})  { logWithCtx(c, "warn", msg, args...) }
+func ErrorCtx(c *gin.Context, msg string, args ...interface{}) { logWithCtx(c, "error", msg, args...) }
+func FatalCtx(c *gin.Context, msg string, args ...interface{}) { logWithCtx(c, "fatal", msg, args...) }

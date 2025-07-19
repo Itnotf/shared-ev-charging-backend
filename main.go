@@ -45,7 +45,7 @@ func main() {
 
 	// 初始化MinIO客户端
 	if err := utils.InitMinioClient(); err != nil {
-		utils.Fatal("初始化MinIO客户端失败: %v", err)
+		// 原日志打印已删除
 	}
 
 	// 设置Gin模式
@@ -127,8 +127,8 @@ func main() {
 
 	// 启动服务器
 	port := config.GetConfig().Server.Port
-	utils.Info("服务器启动在端口 %s", port)
+	// 原日志打印已删除
 	if err := r.Run(":" + port); err != nil {
-		utils.Fatal("服务器启动失败: %v", err)
+		// 原日志打印已删除
 	}
 }

@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"log"
 	"shared-charge/config"
 	"time"
 
@@ -32,13 +31,11 @@ func InitDB() {
 	})
 
 	if err != nil {
-		log.Fatalf("数据库连接失败: %v", err)
 	}
 
 	// 设置数据库连接池参数
 	sqlDB, err := DB.DB()
 	if err != nil {
-		log.Fatalf("获取底层数据库连接失败: %v", err)
 	}
 
 	// 优化连接池配置
@@ -47,5 +44,4 @@ func InitDB() {
 	sqlDB.SetConnMaxLifetime(time.Hour)        // 连接最大复用时间
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute) // 空闲连接超时时间
 
-	log.Println("数据库连接成功")
 }

@@ -22,14 +22,12 @@ func InitMinioClient() error {
 		Secure: cfg.MinIO.UseSSL,
 	})
 	if err != nil {
-		Error("初始化MinIO客户端失败: %v", err)
 		return err
 	}
 
 	// 检查bucket是否存在
 	exists, err := minioClient.BucketExists(context.Background(), cfg.MinIO.BucketName)
 	if err != nil {
-		Error("检查MinIO bucket失败: %v", err)
 		return err
 	}
 
@@ -37,10 +35,8 @@ func InitMinioClient() error {
 	if !exists {
 		err = minioClient.MakeBucket(context.Background(), cfg.MinIO.BucketName, minio.MakeBucketOptions{})
 		if err != nil {
-			Error("创建MinIO bucket失败: %v", err)
 			return err
 		}
-		Info("创建MinIO bucket成功: %s", cfg.MinIO.BucketName)
 
 		// 设置bucket策略为公共读取
 		policy := `{
@@ -56,12 +52,10 @@ func InitMinioClient() error {
 		}`
 		err = minioClient.SetBucketPolicy(context.Background(), cfg.MinIO.BucketName, policy)
 		if err != nil {
-			Error("设置MinIO bucket策略失败: %v", err)
 			return err
 		}
 	}
 
-	Info("MinIO客户端初始化成功，连接到: %s", cfg.MinIO.Endpoint)
 	return nil
 }
 
