@@ -72,6 +72,27 @@ shared_charge/
   ./scripts/migrate.sh up
   ```
 
+## Docker 部署
+我们已经通过GitHub Actions自动构建并发布Docker镜像。你可以使用以下步骤通过Docker部署应用程序。
+
+### 准备 .env 文件
+在项目根目录下，复制`env.example`文件并重命名为`.env`。根据实际环境需求，填写`.env`文件中的变量值。
+
+### 拉取 Docker 镜像
+从Docker Hub或GitHub Packages拉取最新的Docker镜像：
+
+#### 从Docker Hub拉取镜像
+```bash
+docker pull itnotf/shared-ev-charging-backend:latest
+```
+
+### 运行 Docker 容器
+使用以下命令运行Docker容器，并加载`.env`文件中的环境变量：
+
+```bash
+docker run -p 8080:8080 --env-file .env itnotf/shared-ev-charging-backend:latest
+```
+
 ## API 文档（Swagger & swag 工具）
 - 启动后访问 [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html) 查看 Swagger API 文档
 - 主要接口包括：
