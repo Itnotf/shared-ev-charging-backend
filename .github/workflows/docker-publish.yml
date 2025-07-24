@@ -26,4 +26,6 @@ jobs:
       with:
         context: .
         push: true
-        tags: itnotf/shared-ev-charging-backend:${{ github.ref_name }}
+        tags: |
+          itnotf/shared-ev-charging-backend:${{ github.ref_name }}
+          itnotf/shared-ev-charging-backend:latest
