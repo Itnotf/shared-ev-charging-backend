@@ -1,9 +1,8 @@
 name: Docker Image CI
 
 on:
-  push:
-    tags:
-      - '*'  # 监听所有标签的推送
+  release:
+    types: [created]
 
 jobs:
   build:
