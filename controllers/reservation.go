@@ -66,6 +66,12 @@ func CreateReservation(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "用户信息类型错误"})
 		return
 	}
+	// 新增权限校验
+	if !userModel.CanReserve {
+		utils.WarnCtx(c, "用户无预约权限: user_id=%d", userModel.ID)
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "message": "您暂无预约权限，请联系管理员"})
+		return
+	}
 	var req CreateReservationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.WarnCtx(c, "创建预约参数校验失败: %v", err)

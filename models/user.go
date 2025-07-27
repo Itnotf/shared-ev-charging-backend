@@ -8,17 +8,18 @@ import (
 
 // User 用户模型
 type User struct {
-	ID        uint           `json:"id" gorm:"primaryKey"`
-	OpenID    string         `json:"openid" gorm:"column:openid;uniqueIndex;not null"`
-	Name      string         `json:"name" gorm:"not null"`
-	Phone     string         `json:"phone"`
-	Avatar    string         `json:"avatar"`
-	Role      string         `json:"role" gorm:"default:'user'"`
-	Status    string         `json:"status" gorm:"default:'active'"`
-	UnitPrice float64        `json:"unit_price" gorm:"default:0.7"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" swaggerignore:"true"`
+	ID         uint           `json:"id" gorm:"primaryKey"`
+	OpenID     string         `json:"openid" gorm:"column:openid;uniqueIndex;not null"`
+	Name       string         `json:"name" gorm:"not null"`
+	Phone      string         `json:"phone"`
+	Avatar     string         `json:"avatar"`
+	Role       string         `json:"role" gorm:"default:'user'"`
+	Status     string         `json:"status" gorm:"default:'active'"`
+	UnitPrice  float64        `json:"unit_price" gorm:"default:0.7"`
+	CanReserve bool           `json:"can_reserve" gorm:"column:can_reserve;default:false"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `json:"deleted_at" gorm:"index" swaggerignore:"true"`
 }
 
 // TableName 指定表名

@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN can_reserve TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否允许预约'; 
