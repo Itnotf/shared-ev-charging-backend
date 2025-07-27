@@ -74,7 +74,7 @@ func WechatLogin(c *gin.Context) {
 		utils.InfoCtx(c, "创建新用户: openid=%s", authResult.OpenID)
 		userToCreate := service.UserCreateInput{
 			OpenID: authResult.OpenID,
-			Name:   "用户" + authResult.OpenID[len(authResult.OpenID)-6:],
+			Name:   "",
 			Phone:  phone,
 			Role:   "user",
 			Status: "active",
