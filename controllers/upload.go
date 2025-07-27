@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"io"
 	"net/http"
 	"shared-charge/config"
 	"shared-charge/service"
@@ -51,4 +52,30 @@ func UploadImage(c *gin.Context) {
 	}
 	utils.InfoCtx(c, "图片上传成功: user_id=%d, filename=%s", userModel.ID, file.Filename)
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "图片上传成功", "data": result})
+}
+
+// GetImage 读取图片
+// @Summary 获取图片
+// @Description 通过文件名获取图片内容
+// @Tags 文件
+// @Produce octet-stream
+// @Param filename path string true "图片文件名"
+// @Success 200 {file} file
+// @Failure 404 {string} string "文件不存在"
+// @Router /api/image/{filename} [get]
+func GetImage(c *gin.Context) {
+	filename := c.Param("filename")
+	obj, contentType, err := service.GetImageObject(filename)
+	if err != nil {
+		c.String(404, "文件不存在")
+		return
+	}
+	defer obj.Close()
+	c.Header("Content-Type", contentType)
+	c.Status(200)
+	_, err = io.Copy(c.Writer, obj)
+	if err != nil {
+		c.String(500, "文件读取失败")
+		return
+	}
 }

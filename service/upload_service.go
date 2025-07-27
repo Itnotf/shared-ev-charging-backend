@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"path/filepath"
 	"shared-charge/config"
 	"shared-charge/utils"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -55,11 +57,33 @@ func SaveUploadImage(c *gin.Context, userID uint, file *multipart.FileHeader) (m
 		return nil, fmt.Errorf("上传到MinIO失败: %v", err)
 	}
 	// 生成公共URL
-	fileURL := fmt.Sprintf("http://%s/%s/%s", cfg.MinIO.Endpoint, cfg.MinIO.BucketName, objectName)
+	fileURL := fmt.Sprintf("/api/image/%s", objectName)
 	utils.InfoCtx(c, "图片上传成功: user_id=%d, filename=%s", userID, objectName)
 	return map[string]interface{}{
 		"url":      fileURL,
 		"filename": objectName,
 		"size":     file.Size,
 	}, nil
+}
+
+// GetImageObject 读取图片对象和类型
+func GetImageObject(filename string) (io.ReadCloser, string, error) {
+	cfg := config.GetConfig()
+	minioClient := utils.GetMinioClient()
+	obj, err := minioClient.GetObject(context.Background(), cfg.MinIO.BucketName, filename, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, "", err
+	}
+	// 判断 content-type
+	ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(filename), "."))
+	contentType := "application/octet-stream"
+	switch ext {
+	case "jpg", "jpeg":
+		contentType = "image/jpeg"
+	case "png":
+		contentType = "image/png"
+	case "gif":
+		contentType = "image/gif"
+	}
+	return obj, contentType, nil
 }

@@ -110,6 +110,9 @@ func main() {
 			upload.POST("/image", controllers.UploadImage)
 		}
 
+		// 新增：图片读取接口（无需鉴权）
+		api.GET("/image/:filename", controllers.GetImage)
+
 		// 统计相关
 		statistics := api.Group("/statistics")
 		statistics.Use(middleware.AuthMiddleware())
