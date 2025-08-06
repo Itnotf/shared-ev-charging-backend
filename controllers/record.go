@@ -210,3 +210,145 @@ func GetMonthlyShiftStatistics(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": gin.H{"dayKwh": dayKwh, "nightKwh": nightKwh, "totalKwh": totalKwh}})
 }
+
+// UpdateRecordRequest 更新充电记录请求
+type UpdateRecordRequest struct {
+	KWH      float64 `json:"kwh" binding:"required,gt=0"`
+	ImageURL string  `json:"image_url"`
+	Remark   string  `json:"remark"`
+}
+
+// GetRecordsList 获取充电记录列表（按月筛选）
+// @Summary 获取充电记录列表
+// @Description 获取指定月份的充电记录列表
+// @Tags 充电记录
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param month query string true "月份 (YYYY-MM)"
+// @Success 200 {object} map[string]interface{}
+// @Router /records/list [get]
+func GetRecordsList(c *gin.Context) {
+	utils.InfoCtx(c, "获取充电记录列表请求")
+	userModel, ok := utils.GetUserFromContext(c)
+	if !ok {
+		utils.WarnCtx(c, "获取充电记录列表未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
+		return
+	}
+
+	month := c.Query("month")
+	if month == "" {
+		utils.WarnCtx(c, "缺少月份参数")
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "缺少月份参数"})
+		return
+	}
+
+	records, err := service.GetRecordsByMonth(userModel.ID, month)
+	if err != nil {
+		utils.ErrorCtx(c, "获取充电记录列表失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取充电记录列表失败"})
+		return
+	}
+
+	utils.InfoCtx(c, "获取充电记录列表成功: user_id=%d, month=%s, count=%d", userModel.ID, month, len(records))
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": records})
+}
+
+// GetRecordDetail 获取充电记录详情
+// @Summary 获取充电记录详情
+// @Description 根据记录ID获取充电记录详情
+// @Tags 充电记录
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "记录ID"
+// @Success 200 {object} map[string]interface{}
+// @Router /records/{id} [get]
+func GetRecordDetail(c *gin.Context) {
+	utils.InfoCtx(c, "获取充电记录详情请求")
+	userModel, ok := utils.GetUserFromContext(c)
+	if !ok {
+		utils.WarnCtx(c, "获取充电记录详情未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
+		return
+	}
+
+	recordID := c.Param("id")
+	if recordID == "" {
+		utils.WarnCtx(c, "缺少记录ID参数")
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "缺少记录ID参数"})
+		return
+	}
+
+	record, err := service.GetRecordByID(userModel.ID, recordID)
+	if err != nil {
+		utils.ErrorCtx(c, "获取充电记录详情失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取充电记录详情失败"})
+		return
+	}
+
+	if record == nil {
+		utils.WarnCtx(c, "充电记录不存在: record_id=%s, user_id=%d", recordID, userModel.ID)
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "充电记录不存在"})
+		return
+	}
+
+	utils.InfoCtx(c, "获取充电记录详情成功: record_id=%s, user_id=%d", recordID, userModel.ID)
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": record})
+}
+
+// UpdateRecord 更新充电记录
+// @Summary 更新充电记录
+// @Description 根据记录ID更新充电记录信息
+// @Tags 充电记录
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "记录ID"
+// @Param request body UpdateRecordRequest true "更新充电记录请求"
+// @Success 200 {object} map[string]interface{}
+// @Router /records/{id} [put]
+func UpdateRecord(c *gin.Context) {
+	utils.InfoCtx(c, "更新充电记录请求")
+	userModel, ok := utils.GetUserFromContext(c)
+	if !ok {
+		utils.WarnCtx(c, "更新充电记录未认证")
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "用户未认证"})
+		return
+	}
+
+	recordID := c.Param("id")
+	if recordID == "" {
+		utils.WarnCtx(c, "缺少记录ID参数")
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "缺少记录ID参数"})
+		return
+	}
+
+	var req UpdateRecordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.WarnCtx(c, "更新充电记录参数校验失败: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "请求参数错误", "error": err.Error()})
+		return
+	}
+
+	updatedRecord, err := service.UpdateRecordByID(userModel.ID, recordID, service.UpdateRecordRequest{
+		KWH:      req.KWH,
+		ImageURL: req.ImageURL,
+		Remark:   req.Remark,
+	})
+	if err != nil {
+		utils.ErrorCtx(c, "更新充电记录失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "更新充电记录失败"})
+		return
+	}
+
+	if updatedRecord == nil {
+		utils.WarnCtx(c, "充电记录不存在: record_id=%s, user_id=%d", recordID, userModel.ID)
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "message": "充电记录不存在"})
+		return
+	}
+
+	utils.InfoCtx(c, "更新充电记录成功: record_id=%s, user_id=%d", recordID, userModel.ID)
+	c.JSON(http.StatusOK, gin.H{"code": 200, "message": "更新成功", "data": updatedRecord})
+}

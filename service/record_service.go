@@ -310,3 +310,110 @@ func GetDailyStatisticsWithShift(userID uint, month string) ([]map[string]interf
 	})
 	return resp, nil
 }
+
+// GetRecordsByMonth 获取指定月份的充电记录列表
+func GetRecordsByMonth(userID uint, month string) ([]map[string]interface{}, error) {
+	// 获取月份日期范围
+	startDate, endDate, err := getMonthDateRange(month)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []models.Record
+	err = models.DB.Where("user_id = ? AND date >= ? AND date <= ?", userID, startDate, endDate).
+		Order("date DESC, created_at DESC").
+		Find(&records).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 组装返回数据
+	var resp []map[string]interface{}
+	for _, record := range records {
+		resp = append(resp, map[string]interface{}{
+			"id":         record.ID,
+			"date":       record.Date.Format("2006-01-02"),
+			"timeslot":   record.Timeslot,
+			"kwh":        record.KWH,
+			"amount":     record.Amount,
+			"remark":     record.Remark,
+			"image_url":  record.ImageURL,
+			"created_at": record.CreatedAt,
+			"updated_at": record.UpdatedAt,
+		})
+	}
+
+	return resp, nil
+}
+
+// GetRecordByID 根据ID获取充电记录详情
+func GetRecordByID(userID uint, recordID string) (map[string]interface{}, error) {
+	var record models.Record
+	err := models.DB.Where("id = ? AND user_id = ?", recordID, userID).First(&record).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"id":         record.ID,
+		"date":       record.Date.Format("2006-01-02"),
+		"timeslot":   record.Timeslot,
+		"kwh":        record.KWH,
+		"amount":     record.Amount,
+		"remark":     record.Remark,
+		"image_url":  record.ImageURL,
+		"created_at": record.CreatedAt,
+		"updated_at": record.UpdatedAt,
+	}, nil
+}
+
+// UpdateRecordByID 根据ID更新充电记录
+func UpdateRecordByID(userID uint, recordID string, req UpdateRecordRequest) (map[string]interface{}, error) {
+	var record models.Record
+	err := models.DB.Where("id = ? AND user_id = ?", recordID, userID).First(&record).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 更新记录
+	updates := map[string]interface{}{
+		"kwh":        req.KWH,
+		"remark":     req.Remark,
+		"updated_at": time.Now(),
+	}
+
+	// 如果提供了新的图片URL，则更新
+	if req.ImageURL != "" {
+		updates["image_url"] = req.ImageURL
+	}
+
+	// 重新计算费用
+	record.KWH = req.KWH
+	record.CalculateAmount()
+	updates["amount"] = record.Amount
+
+	err = models.DB.Model(&record).Updates(updates).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 返回更新后的记录
+	return map[string]interface{}{
+		"id":         record.ID,
+		"date":       record.Date.Format("2006-01-02"),
+		"timeslot":   record.Timeslot,
+		"kwh":        record.KWH,
+		"amount":     record.Amount,
+		"remark":     record.Remark,
+		"image_url":  record.ImageURL,
+		"created_at": record.CreatedAt,
+		"updated_at": record.UpdatedAt,
+	}, nil
+}
+
+// UpdateRecordRequest 更新充电记录请求结构
+type UpdateRecordRequest struct {
+	KWH      float64 `json:"kwh"`
+	ImageURL string  `json:"image_url"`
+	Remark   string  `json:"remark"`
+}

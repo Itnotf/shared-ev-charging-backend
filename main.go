@@ -101,6 +101,9 @@ func main() {
 			records.GET("", controllers.GetRecords)
 			records.POST("", controllers.CreateRecord)
 			records.GET("/unsubmitted", controllers.GetUnsubmittedRecords)
+			records.GET("/list", controllers.GetRecordsList)
+			records.GET("/:id", controllers.GetRecordDetail)
+			records.PUT("/:id", controllers.UpdateRecord)
 		}
 
 		// 文件上传
