@@ -7,6 +7,7 @@
 - 微信小程序一键登录（JWT 认证）
 - 充电位预约（支持白班/夜班）
 - 充电记录管理（上传用电量、图片、备注等）
+- 充电记录查询与更新（按月筛选、详情查看、记录编辑）
 - 统计报表（月度、每日、分时段）
 - 用户专属电价管理
 - 文件上传（图片，MinIO 对象存储）
@@ -95,22 +96,44 @@ docker run -p 8080:8080 --env-file .env itnotf/shared-ev-charging-backend:latest
 
 ## API 文档（Swagger & swag 工具）
 - 启动后访问 [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html) 查看 Swagger API 文档
-- 主要接口包括：
-  - `/api/auth/login` 微信登录
-  - `/api/auth/refresh` 刷新 token
-  - `/api/users/profile` 用户信息
-  - `/api/users/price` 用户电价
-  - `/api/users/profile` 用户信息更新（POST）
-  - `/api/reservations` 预约管理（GET/POST/DELETE）
-  - `/api/reservations/current` 当前预约
-  - `/api/reservations/current-status` 当前预约及充电状态
-  - `/api/records` 充电记录（GET/POST）
-  - `/api/records/unsubmitted` 未提交记录
-  - `/api/upload/image` 文件上传
-  - `/api/statistics/monthly` 月度统计
-  - `/api/statistics/daily` 每日统计
-  - `/api/statistics/monthly-shift` 分时段统计
-  - `/health` 健康检查
+
+### 主要接口列表
+
+#### 认证相关
+- `POST /api/auth/login` 微信登录
+- `POST /api/auth/refresh` 刷新 token
+
+#### 用户相关
+- `GET /api/users/profile` 获取用户信息
+- `POST /api/users/profile` 更新用户信息
+- `GET /api/users/price` 获取用户电价
+
+#### 预约相关
+- `GET /api/reservations` 获取预约列表
+- `POST /api/reservations` 创建预约
+- `DELETE /api/reservations/:id` 删除预约
+- `GET /api/reservations/current` 获取当前预约
+- `GET /api/reservations/current-status` 获取当前预约及充电状态
+
+#### 充电记录相关
+- `GET /api/records` 获取充电记录列表
+- `POST /api/records` 创建充电记录
+- `GET /api/records/unsubmitted` 获取未提交记录
+- `GET /api/records/list` 获取指定月份充电记录列表
+- `GET /api/records/:id` 获取充电记录详情
+- `PUT /api/records/:id` 更新充电记录
+
+#### 文件上传
+- `POST /api/upload/image` 上传图片
+- `GET /api/image/:filename` 获取图片
+
+#### 统计相关
+- `GET /api/statistics/monthly` 月度统计
+- `GET /api/statistics/daily` 每日统计
+- `GET /api/statistics/monthly-shift` 分时段统计
+
+#### 系统相关
+- `GET /health` 健康检查
 
 ### Swagger 文档生成与更新
 本项目使用 [swag](https://github.com/swaggo/swag) 工具自动生成 API 文档。
