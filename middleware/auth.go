@@ -141,7 +141,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			}
 			c.Set("user", *user)
 			c.Next()
-			return
+			// return
 		}
 
 		// 缓存未命中，查询数据库
