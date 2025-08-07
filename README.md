@@ -135,6 +135,12 @@ docker run -p 8080:8080 --env-file .env itnotf/shared-ev-charging-backend:latest
 #### 系统相关
 - `GET /health` 健康检查
 
+#### 管理员相关（仅管理员可访问）
+- `GET /api/admin/users` 获取所有用户列表
+- `POST /api/admin/user/can_reserve` 修改用户预约权限
+- `POST /api/admin/user/unit_price` 修改用户电价
+- `GET /api/admin/monthly_report` 获取月度对账数据
+
 ### Swagger 文档生成与更新
 本项目使用 [swag](https://github.com/swaggo/swag) 工具自动生成 API 文档。
 
@@ -179,6 +185,35 @@ curl -H "Authorization: Bearer <token>" http://localhost:8080/api/users/profile
 ### 上传图片
 ```bash
 curl -X POST http://localhost:8080/api/upload/image -H "Authorization: Bearer <token>" -F "file=@test.jpg"
+```
+
+### 管理员接口示例
+
+#### 获取所有用户列表
+```bash
+curl -H "Authorization: Bearer <admin_token>" http://localhost:8080/api/admin/users
+```
+
+#### 修改用户预约权限
+```bash
+curl -X POST http://localhost:8080/api/admin/user/can_reserve \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "can_reserve": false}'
+```
+
+#### 修改用户电价
+```bash
+curl -X POST http://localhost:8080/api/admin/user/unit_price \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": 1, "unit_price": 0.65}'
+```
+
+#### 获取月度对账数据
+```bash
+curl -H "Authorization: Bearer <admin_token>" \
+  "http://localhost:8080/api/admin/monthly_report?month=2024-08"
 ```
 
 ## 贡献说明
