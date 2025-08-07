@@ -125,6 +125,16 @@ func main() {
 			statistics.GET("/monthly-shift", controllers.GetMonthlyShiftStatistics)
 		}
 
+		// 管理员相关
+		admin := api.Group("/admin")
+		admin.Use(middleware.AuthMiddleware(), middleware.AdminRequired())
+		{
+			admin.GET("/users", controllers.GetAllUsers)
+			admin.POST("/user/can_reserve", controllers.UpdateUserCanReserve)
+			admin.POST("/user/unit_price", controllers.UpdateUserUnitPrice)
+			admin.GET("/monthly_report", controllers.GetMonthlyReport)
+		}
+
 	}
 
 	// Swagger文档
