@@ -1,0 +1,223 @@
+# Shared EV Charging Backend - Cursor Rules
+
+## 项目概述
+基于Go语言开发的共享电动汽车充电位管理系统后端，使用Gin框架、PostgreSQL数据库、Redis缓存和MinIO对象存储。
+
+## 编码规范
+
+### Go语言规范
+- 使用Go 1.23.0+版本，遵循官方代码规范
+- 使用gofmt自动格式化，所有导出函数和结构体必须有注释
+- 错误处理必须显式处理，使用context.Context传递请求上下文
+
+### 命名规范
+- 包名：小写字母，简短有意义
+- 文件名：snake_case
+- 结构体字段：snake_case，JSON标签snake_case
+- 常量：UPPER_SNAKE_CASE
+- 变量和函数：camelCase
+- 接口名：以er结尾（Handler, Service）
+
+### 代码组织与分层架构
+```
+HTTP Request → Middleware → Controller → Service → Model → Database
+```
+- **controllers/**: HTTP请求和响应处理
+- **service/**: 业务逻辑处理
+- **models/**: 数据模型定义
+- **middleware/**: HTTP中间件
+- **utils/**: 通用工具函数
+- **config/**: 配置管理
+
+## 架构指导
+
+### 依赖注入与错误处理
+- 使用依赖注入模式，避免硬编码依赖
+- 服务层通过接口定义，便于测试和扩展
+- 使用统一的错误响应格式，业务错误使用自定义错误类型
+- 敏感信息不在错误响应中暴露
+
+### 日志规范
+- 使用结构化日志（zap），记录请求ID用于追踪
+- Info: 正常业务流程，Warn: 业务警告，Error: 系统错误，Debug: 调试信息
+
+## 数据库规范
+
+### 模型定义与迁移
+- 使用GORM标签定义数据库结构，必须包含created_at, updated_at时间戳
+- 软删除使用deleted_at字段，外键关系和索引使用gorm标签定义
+- 使用golang-migrate管理迁移，文件命名：`NNN_<summary>.up.sql` / `NNN_<summary>.down.sql`
+- 每个迁移必须有up和down文件，迁移脚本放在migrations/目录
+
+### 查询优化
+- 使用索引优化查询性能，避免N+1查询问题
+- 复杂查询使用原生SQL，分页查询使用LIMIT和OFFSET
+
+## API设计规范
+
+### RESTful API与认证
+- 使用标准HTTP方法，URL使用名词复数形式，状态码使用标准HTTP状态码
+- 响应格式统一使用JSON：
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {},
+  "error": null
+}
+```
+- 使用JWT进行身份认证（Bearer Token），角色权限控制（user/admin）
+- 使用gin的binding标签验证参数，参数错误返回400状态码
+
+## 安全规范
+
+### 输入验证与访问控制
+- 所有用户输入必须验证，防止SQL注入（使用参数化查询）
+- 防止XSS攻击（输出转义），文件上传类型和大小限制
+- 密码等敏感信息不能明文存储，配置文件中的敏感信息使用环境变量
+- 日志中不能记录敏感信息，API响应中过滤敏感字段
+- 基于角色的访问控制（RBAC），资源级别的权限控制，防止越权访问
+
+## 性能优化
+
+### 缓存与数据库优化
+- 使用Redis缓存热点数据，用户信息缓存1小时，统计数据缓存适当时间
+- 连接池配置优化，查询语句优化，索引策略合理，定期清理无用数据
+- 使用goroutine处理并发任务，避免goroutine泄漏，使用context控制超时
+
+## 测试规范
+
+### 单元测试与集成测试
+- 核心业务逻辑必须有单元测试，测试覆盖率不低于80%
+- 使用table driven tests，Mock外部依赖
+- API接口集成测试，数据库集成测试，第三方服务集成测试
+- 使用测试数据库，测试数据独立管理，测试后清理数据
+
+## 部署规范
+
+### 环境配置与Docker部署
+- 使用环境变量管理配置，不同环境使用不同配置文件
+- 敏感配置使用密钥管理，配置变更需要版本控制
+- 使用多阶段构建，镜像大小优化，健康检查配置，资源限制配置
+- 应用性能监控，错误率监控，资源使用监控，业务指标监控
+
+## 特定业务规则
+
+### 预约系统
+- 同一天同一时段只能有一条有效预约
+- 预约状态流转：pending → confirmed → completed/cancelled
+- 预约结束前必须上传充电记录，支持日班和夜班时段
+
+### 充电记录
+- 费用自动计算（度数 × 单价），支持图片上传（电量截图）
+- 记录关联预约信息，支持记录编辑和删除
+
+### 用户管理
+- 微信登录自动创建用户，用户电价个性化设置
+- 预约权限控制，用户状态管理
+
+## 代码示例
+
+### 控制器示例
+```go
+// GetUserProfile 获取用户信息
+// @Summary 获取用户信息
+// @Tags 用户
+// @Security BearerAuth
+// @Success 200 {object} Response{data=User}
+// @Router /users/profile [get]
+func GetUserProfile(c *gin.Context) {
+    userID := c.GetUint("user_id")
+    user, err := service.GetUserByID(userID)
+    if err != nil {
+        utils.ErrorCtx(c, "获取用户信息失败: %v", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "获取用户信息失败"})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"code": 200, "message": "success", "data": user.FormatUserInfo()})
+}
+```
+
+### 模型示例
+```go
+// User 用户模型
+type User struct {
+    ID         uint           `json:"id" gorm:"primaryKey"`
+    OpenID     string         `json:"openid" gorm:"column:openid;uniqueIndex;not null"`
+    Name       string         `json:"name" gorm:"not null"`
+    Phone      string         `json:"phone"`
+    Avatar     string         `json:"avatar"`
+    Role       string         `json:"role" gorm:"default:'user'"`
+    Status     string         `json:"status" gorm:"default:'active'"`
+    UnitPrice  float64        `json:"unit_price" gorm:"default:0.7"`
+    CanReserve bool           `json:"can_reserve" gorm:"column:can_reserve;default:false"`
+    CreatedAt  time.Time      `json:"created_at"`
+    UpdatedAt  time.Time      `json:"updated_at"`
+    DeletedAt  gorm.DeletedAt `json:"deleted_at" gorm:"index"`
+}
+```
+
+## 禁止项（Hard Rules）
+
+- 禁止绕过中间件链路直接访问服务层或模型层
+- 禁止在控制器中写复杂业务逻辑；必须下沉到服务层
+- 禁止将敏感信息写入仓库或日志
+- 禁止无 up/down 的数据库变更文件合入主分支
+- 禁止在未达成质量门禁时合并或发布
+
+## 变更后检查与提交信息生成
+
+### A. 文档与规则同步决策
+- **README 更新条件**：公共API变更、环境变量变更、启动/构建/依赖变更、数据库迁移、系统能力调整
+- **README.zh-CN**：若README更新，需镜像同步
+- **.cursorrules 更新条件**：目录结构/分层职责调整、质量门禁变更、安全策略变更、分支/提交/CI/CD流程变更
+
+### B. 快速检查清单
+- [ ] Public API变更？已更新Swagger与README/README.zh-CN
+- [ ] 环境变量变更？已更新README环境变量说明
+- [ ] 运行/构建/依赖变更？已更新README与脚本帮助
+- [ ] 数据库迁移？包含up/down、测试库验证、文档说明
+- [ ] 目录/分层/规范调整？已更新.cursorrules
+- [ ] 安全/权限/上传/CORS变更？已更新规范与文档
+- [ ] 性能与缓存策略调整？已记录在.cursorrules与README
+
+### C. 推荐英文Commit Message
+
+**模板：**
+```text
+<type>(<scope>): <summary>
+
+<why this change>
+<what changed>
+
+Docs: README/README.zh-CN updated or n/a
+DB: Migration yes/no; files: <files or n/a>
+Breaking: yes/no
+```
+
+**常用类型与scope：**
+- type: feat, fix, refactor, docs, test, chore, perf, build, ci
+- scope: controllers, service, models, middleware, config, utils, migrations, docs, scripts
+
+**示例：**
+```text
+feat(reservation): prevent duplicate booking per day/timeslot
+
+Add unique index and business validation to ensure users can only 
+have one active reservation per day/timeslot combination.
+
+Docs: README/README.zh-CN updated reservation rules
+DB: Migration yes; files: 007_add_reservation_unique_index
+Breaking: no
+```
+
+## 质量门禁（本地与CI）
+
+合并或发布前必须全部通过：
+- 格式: `gofmt` 全量通过
+- Lint: `golangci-lint` 零阻断性问题
+- 静态分析: `go vet` 零阻断性问题
+- 构建: `go build ./...` 成功
+- 测试: `go test ./... -race` 通过；核心业务覆盖率≥80%
+- API文档: Swagger注解与生成文件同步，文档能正常打开
+- 数据库: 如包含迁移，需具备可回滚的up/down，并在测试库验证通过
