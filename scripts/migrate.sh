@@ -5,6 +5,21 @@
 
 set -e
 
+# 读取 .env 文件
+if [ -f ".env" ]; then
+    echo "读取 .env 文件..."
+    # 只读取数据库相关的环境变量
+    while IFS= read -r line; do
+        # 跳过注释行和空行
+        if [[ ! "$line" =~ ^[[:space:]]*# ]] && [[ -n "$line" ]]; then
+            # 只处理数据库相关的变量
+            if [[ "$line" =~ ^DB_ ]]; then
+                export "$line"
+            fi
+        fi
+    done < .env
+fi
+
 # 数据库连接配置
 DB_HOST=${DB_HOST:-"localhost"}
 DB_PORT=${DB_PORT:-"5432"}

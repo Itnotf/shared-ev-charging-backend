@@ -13,9 +13,10 @@ import (
 
 // CreateReservationRequest 创建预约请求
 type CreateReservationRequest struct {
-	Date     string `json:"date" binding:"required"`
-	Timeslot string `json:"timeslot" binding:"required,oneof=day night"`
-	Remark   string `json:"remark"`
+	Date           string `json:"date" binding:"required"`
+	Timeslot       string `json:"timeslot" binding:"required,oneof=day night"`
+	Remark         string `json:"remark"`
+	LicensePlateID *uint  `json:"license_plate_id"`
 }
 
 // GetReservations 获取预约列表
@@ -84,7 +85,7 @@ func CreateReservation(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "日期格式错误", "error": err.Error()})
 		return
 	}
-	reservation, err := service.CreateReservationWithCheck(c, userModel.ID, date, req.Timeslot, req.Remark)
+	reservation, err := service.CreateReservationWithCheck(c, userModel.ID, date, req.Timeslot, req.Remark, req.LicensePlateID)
 	if err != nil {
 		utils.ErrorCtx(c, "创建预约失败: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "创建预约失败"})

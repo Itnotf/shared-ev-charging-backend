@@ -83,6 +83,18 @@ func main() {
 			users.GET("/price", controllers.GetUserPrice)
 		}
 
+		// 车牌号管理
+		licensePlateController := controllers.NewLicensePlateController()
+		user := api.Group("/user")
+		user.Use(middleware.AuthMiddleware())
+		{
+			user.GET("/license-plates", licensePlateController.GetUserLicensePlates)
+			user.POST("/license-plates", licensePlateController.CreateLicensePlate)
+			user.PUT("/license-plates/:id", licensePlateController.UpdateLicensePlate)
+			user.DELETE("/license-plates/:id", licensePlateController.DeleteLicensePlate)
+			user.PUT("/license-plates/:id/set-default", licensePlateController.SetDefaultLicensePlate)
+		}
+
 		// 预约相关
 		reservations := api.Group("/reservations")
 		reservations.Use(middleware.AuthMiddleware())

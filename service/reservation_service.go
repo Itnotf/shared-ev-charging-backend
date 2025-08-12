@@ -21,7 +21,7 @@ func GetReservationsByUser(c *gin.Context, userID uint, date string) ([]models.R
 			query = query.Where("to_char(date, 'YYYY-MM') = ?", date)
 		}
 	}
-	err := query.Order("date DESC, created_at DESC").Find(&reservations).Error
+	err := query.Preload("User").Preload("LicensePlate").Order("date DESC, created_at DESC").Find(&reservations).Error
 	if err != nil {
 		utils.ErrorCtx(c, "查询用户预约列表失败: %v", err)
 	}
@@ -29,11 +29,11 @@ func GetReservationsByUser(c *gin.Context, userID uint, date string) ([]models.R
 }
 
 // 创建预约并做业务校验
-func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, timeslot, remark string) (models.Reservation, error) {
+func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, timeslot, remark string, licensePlateID *uint) (models.Reservation, error) {
 	utils.InfoCtx(c, "创建预约业务校验: user_id=%d, date=%s, timeslot=%s", userID, date.Format("2006-01-02"), timeslot)
 	// 检查是否有未完成预约
 	var ongoing models.Reservation
-	err := models.DB.Where("user_id = ? AND status = ? AND date >= ?", userID, "pending", time.Now().Format("2006-01-02")).First(&ongoing).Error
+	err := models.DB.Where("user_id = ? AND status = ? AND date >= ?", userID, "pending", time.Now().Format("2006-01-02")).Preload("User").Preload("LicensePlate").First(&ongoing).Error
 	if err == nil {
 		utils.WarnCtx(c, "有未结束预约，不能重复预约: user_id=%d", userID)
 		return models.Reservation{}, errors.New("您有未结束的预约，不能重复预约")
@@ -41,7 +41,7 @@ func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, tim
 
 	// 检查上一次预约是否未上传充电记录
 	var lastReservation models.Reservation
-	errLast := models.DB.Where("user_id = ? AND status != ?", userID, "cancelled").Order("date DESC").First(&lastReservation).Error
+	errLast := models.DB.Where("user_id = ? AND status != ?", userID, "cancelled").Preload("User").Preload("LicensePlate").Order("date DESC").First(&lastReservation).Error
 	if errLast == nil {
 		var endTime time.Time
 		switch lastReservation.Timeslot {
@@ -71,18 +71,29 @@ func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, tim
 		return models.Reservation{}, errors.New("同一天同一时段只能有一条有效预约")
 	}
 
+	// 验证车牌号是否属于当前用户
+	if licensePlateID != nil {
+		var licensePlate models.LicensePlate
+		err := models.DB.Where("id = ? AND user_id = ?", *licensePlateID, userID).First(&licensePlate).Error
+		if err != nil {
+			utils.WarnCtx(c, "车牌号不存在或不属于当前用户: user_id=%d, license_plate_id=%d", userID, *licensePlateID)
+			return models.Reservation{}, errors.New("车牌号不存在或不属于当前用户")
+		}
+	}
+
 	reservation := models.Reservation{
-		UserID:   userID,
-		Date:     date,
-		Timeslot: timeslot,
-		Status:   "pending",
-		Remark:   remark,
+		UserID:         userID,
+		Date:           date,
+		Timeslot:       timeslot,
+		Status:         "pending",
+		Remark:         remark,
+		LicensePlateID: licensePlateID,
 	}
 	if err := models.DB.Create(&reservation).Error; err != nil {
 		utils.ErrorCtx(c, "创建预约入库失败: %v", err)
 		return models.Reservation{}, err
 	}
-	models.DB.Preload("User").First(&reservation, reservation.ID)
+	models.DB.Preload("User").Preload("LicensePlate").First(&reservation, reservation.ID)
 	utils.InfoCtx(c, "预约创建成功: user_id=%d, reservation_id=%d", userID, reservation.ID)
 	return reservation, nil
 }
@@ -91,7 +102,7 @@ func CreateReservationWithCheck(c *gin.Context, userID uint, date time.Time, tim
 func CancelReservation(c *gin.Context, id, userID uint) error {
 	utils.InfoCtx(c, "取消预约: user_id=%d, reservation_id=%d", userID, id)
 	var reservation models.Reservation
-	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).First(&reservation).Error; err != nil {
+	if err := models.DB.Where("id = ? AND user_id = ?", id, userID).Preload("User").Preload("LicensePlate").First(&reservation).Error; err != nil {
 		utils.ErrorCtx(c, "取消预约查找失败: %v", err)
 		return err
 	}
@@ -114,6 +125,7 @@ func GetCurrentReservationStatus(c *gin.Context, userID uint) (map[string]interf
 	err := models.DB.
 		Where("user_id = ? AND status = ?", userID, "pending").
 		Preload("User").
+		Preload("LicensePlate").
 		Order("date DESC, id DESC").
 		First(&lastReservation).Error
 	if err == nil {
@@ -156,7 +168,7 @@ func FormatReservationDate(res *models.Reservation) map[string]interface{} {
 	// 使用公共的用户信息格式化函数
 	userInfo := res.User.FormatUserInfo()
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"id":          res.ID,
 		"user_id":     res.UserID,
 		"date":        res.Date.Format("2006-01-02"),
@@ -168,6 +180,16 @@ func FormatReservationDate(res *models.Reservation) map[string]interface{} {
 		"user_name":   userInfo["user_name"],
 		"user_avatar": userInfo["user_avatar"],
 	}
+
+	// 添加车牌号信息
+	if res.LicensePlate != nil {
+		result["license_plate"] = map[string]interface{}{
+			"id":           res.LicensePlate.ID,
+			"plate_number": res.LicensePlate.PlateNumber,
+		}
+	}
+
+	return result
 }
 
 // 创建预约
@@ -177,7 +199,7 @@ func CreateReservation(userID uint, date string, timeslot string) (*models.Reser
 		return nil, err
 	}
 
-	reservation, err := CreateReservationWithCheck(nil, userID, parsedDate, timeslot, "") // Pass nil for gin.Context
+	reservation, err := CreateReservationWithCheck(nil, userID, parsedDate, timeslot, "", nil) // Pass nil for gin.Context and licensePlateID
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +216,7 @@ func DeleteReservation(id, userID uint) error {
 func GetCurrentReservation(c *gin.Context, userID uint) (models.Reservation, error) {
 	utils.InfoCtx(c, "查询当前预约: user_id=%d", userID)
 	var reservation models.Reservation
-	err := models.DB.Where("user_id = ? AND status != ? AND date >= ?", userID, "cancelled", time.Now().Format("2006-01-02")).Order("date ASC").First(&reservation).Error
+	err := models.DB.Where("user_id = ? AND status != ? AND date >= ?", userID, "cancelled", time.Now().Format("2006-01-02")).Preload("User").Preload("LicensePlate").Order("date ASC").First(&reservation).Error
 	if err != nil {
 		utils.WarnCtx(c, "查询当前预约失败: %v", err)
 	}
@@ -213,7 +235,7 @@ func GetReservations(c *gin.Context, date string) ([]models.Reservation, error) 
 			query = query.Where("to_char(date, 'YYYY-MM') = ?", date)
 		}
 	}
-	err := query.Preload("User").Order("date DESC, created_at DESC").Find(&reservations).Error
+	err := query.Preload("User").Preload("LicensePlate").Order("date DESC, created_at DESC").Find(&reservations).Error
 	if err != nil {
 		utils.ErrorCtx(c, "查询预约列表失败: %v", err)
 	}

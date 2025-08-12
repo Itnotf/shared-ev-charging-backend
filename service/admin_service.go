@@ -83,7 +83,25 @@ func GetMonthlyReport(c *gin.Context, month string) (map[string]interface{}, err
 
 	var result []map[string]interface{}
 	for _, user := range users {
-		// 修正聚合查询
+		// 获取用户的车牌号列表
+		var licensePlates []models.LicensePlate
+		models.DB.Where("user_id = ?", user.ID).Find(&licensePlates)
+
+		// 按车牌号统计记录
+		var licensePlateStats []struct {
+			LicensePlateID uint
+			PlateNumber    string
+			TotalAmount    int64
+			RecordCount    int64
+		}
+		models.DB.Model(&models.Record{}).
+			Select("records.license_plate_id, license_plates.plate_number, COALESCE(SUM(records.amount), 0) as total_amount, COUNT(*) as record_count").
+			Joins("LEFT JOIN license_plates ON records.license_plate_id = license_plates.id").
+			Where("records.user_id = ? AND records.date >= ? AND records.date <= ?", user.ID, startDate, endDate).
+			Group("records.license_plate_id, license_plates.plate_number").
+			Scan(&licensePlateStats)
+
+		// 计算总金额
 		type aggResult struct {
 			TotalAmount int64
 		}
@@ -101,12 +119,34 @@ func GetMonthlyReport(c *gin.Context, month string) (map[string]interface{}, err
 			hasUploaded = false
 		}
 
+		// 构建车牌号统计信息
+		var licensePlateData []map[string]interface{}
+		for _, stat := range licensePlateStats {
+			licensePlateData = append(licensePlateData, map[string]interface{}{
+				"plate_number":  stat.PlateNumber,
+				"total_amount":  float64(stat.TotalAmount) / 100.0,
+				"record_count":  stat.RecordCount,
+				"has_uploaded":  hasUploaded, // 暂时使用用户级别的上传状态
+			})
+		}
+
+		// 如果没有车牌号记录，添加默认车牌号信息
+		if len(licensePlateData) == 0 {
+			licensePlateData = append(licensePlateData, map[string]interface{}{
+				"plate_number":  "未绑定车牌号",
+				"total_amount":  0.0,
+				"record_count":  0,
+				"has_uploaded":  hasUploaded,
+			})
+		}
+
 		userData := map[string]interface{}{
-			"id":           user.ID,
-			"user_name":    user.Name,
-			"avatar":       user.Avatar,
-			"total_amount": float64(agg.TotalAmount) / 100.0,
-			"has_uploaded": hasUploaded,
+			"id":             user.ID,
+			"user_name":      user.Name,
+			"avatar":         user.Avatar,
+			"license_plates": licensePlateData,
+			"total_amount":   float64(agg.TotalAmount) / 100.0,
+			"has_uploaded":   hasUploaded,
 		}
 		result = append(result, userData)
 	}

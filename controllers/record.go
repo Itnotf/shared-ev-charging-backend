@@ -12,12 +12,13 @@ import (
 
 // CreateRecordRequest 创建充电记录请求
 type CreateRecordRequest struct {
-	Date          string  `json:"date" binding:"required"`
-	KWH           float64 `json:"kwh" binding:"required,gt=0"`
-	ImageURL      string  `json:"image_url"`
-	Remark        string  `json:"remark"`
-	ReservationID uint    `json:"reservation_id"`
-	Timeslot      string  `json:"timeslot"`
+	Date           string  `json:"date" binding:"required"`
+	KWH            float64 `json:"kwh" binding:"required,gt=0"`
+	ImageURL       string  `json:"image_url"`
+	Remark         string  `json:"remark"`
+	ReservationID  uint    `json:"reservation_id"`
+	Timeslot       string  `json:"timeslot"`
+	LicensePlateID *uint   `json:"license_plate_id"`
 }
 
 // GetRecords 获取充电记录列表
@@ -82,14 +83,15 @@ func CreateRecord(c *gin.Context) {
 		unitPrice = config.GetConfig().App.DefaultUnitPrice
 	}
 	createReq := service.CreateRecordRequest{
-		UserID:        userModel.ID,
-		Date:          req.Date,
-		KWH:           req.KWH,
-		ReservationID: req.ReservationID,
-		Timeslot:      req.Timeslot,
-		UnitPrice:     unitPrice,
-		ImageURL:      req.ImageURL, // 修复：传递 image_url
-		Remark:        req.Remark,   // 修复：传递 remark
+		UserID:         userModel.ID,
+		Date:           req.Date,
+		KWH:            req.KWH,
+		ReservationID:  req.ReservationID,
+		Timeslot:       req.Timeslot,
+		UnitPrice:      unitPrice,
+		ImageURL:       req.ImageURL, // 修复：传递 image_url
+		Remark:         req.Remark,   // 修复：传递 remark
+		LicensePlateID: req.LicensePlateID,
 	}
 	if err := service.CreateRecordWithTimeslot(c, createReq); err != nil {
 		utils.ErrorCtx(c, "创建充电记录失败: %v", err)
@@ -213,9 +215,10 @@ func GetMonthlyShiftStatistics(c *gin.Context) {
 
 // UpdateRecordRequest 更新充电记录请求
 type UpdateRecordRequest struct {
-	KWH      float64 `json:"kwh" binding:"required,gt=0"`
-	ImageURL string  `json:"image_url"`
-	Remark   string  `json:"remark"`
+	KWH            float64 `json:"kwh" binding:"required,gt=0"`
+	ImageURL       string  `json:"image_url"`
+	Remark         string  `json:"remark"`
+	LicensePlateID *uint   `json:"license_plate_id"`
 }
 
 // GetRecordsList 获取充电记录列表（按月筛选）
@@ -333,9 +336,10 @@ func UpdateRecord(c *gin.Context) {
 	}
 
 	updatedRecord, err := service.UpdateRecordByID(userModel.ID, recordID, service.UpdateRecordRequest{
-		KWH:      req.KWH,
-		ImageURL: req.ImageURL,
-		Remark:   req.Remark,
+		KWH:            req.KWH,
+		ImageURL:       req.ImageURL,
+		Remark:         req.Remark,
+		LicensePlateID: req.LicensePlateID,
 	})
 	if err != nil {
 		utils.ErrorCtx(c, "更新充电记录失败: %v", err)

@@ -41,14 +41,15 @@ func GetRecentRecordsByUser(userID uint, limit int) ([]models.Record, error) {
 
 // 创建充电记录（自动查预约表获取 timeslot）
 type CreateRecordRequest struct {
-	Date          string
-	KWH           float64
-	ImageURL      string
-	Remark        string
-	ReservationID uint
-	UnitPrice     float64
-	UserID        uint
-	Timeslot      string
+	Date           string
+	KWH            float64
+	ImageURL       string
+	Remark         string
+	ReservationID  uint
+	UnitPrice      float64
+	UserID         uint
+	Timeslot       string
+	LicensePlateID *uint
 }
 
 func CreateRecordWithTimeslot(c *gin.Context, req CreateRecordRequest) error {
@@ -87,15 +88,26 @@ func CreateRecordWithTimeslot(c *gin.Context, req CreateRecordRequest) error {
 			return errors.New("一个预约只能上传一条充电记录")
 		}
 	}
+	// 验证车牌号是否属于当前用户
+	if req.LicensePlateID != nil {
+		var licensePlate models.LicensePlate
+		err := models.DB.Where("id = ? AND user_id = ?", *req.LicensePlateID, req.UserID).First(&licensePlate).Error
+		if err != nil {
+			utils.WarnCtx(c, "车牌号不存在或不属于当前用户: user_id=%d, license_plate_id=%d", req.UserID, *req.LicensePlateID)
+			return errors.New("车牌号不存在或不属于当前用户")
+		}
+	}
+
 	record := &models.Record{
-		UserID:        req.UserID,
-		Date:          date,
-		KWH:           req.KWH,
-		UnitPrice:     req.UnitPrice,
-		ImageURL:      req.ImageURL,
-		Remark:        req.Remark,
-		ReservationID: req.ReservationID,
-		Timeslot:      timeslot,
+		UserID:         req.UserID,
+		Date:           date,
+		KWH:            req.KWH,
+		UnitPrice:      req.UnitPrice,
+		ImageURL:       req.ImageURL,
+		Remark:         req.Remark,
+		ReservationID:  req.ReservationID,
+		Timeslot:       timeslot,
+		LicensePlateID: req.LicensePlateID,
 	}
 	utils.InfoCtx(c, "即将写入数据库的 record.ImageURL=%s", record.ImageURL)
 	record.CalculateAmount()
@@ -212,7 +224,7 @@ func GetRecentRecordsWithTimeslotByUser(c *gin.Context, userID uint, limit int) 
 		limit = defaultLimit
 	}
 	var records []models.Record
-	err := models.DB.Where("user_id = ?", userID).Order("created_at DESC").Limit(limit).Find(&records).Error
+	err := models.DB.Where("user_id = ?", userID).Preload("LicensePlate").Order("created_at DESC").Limit(limit).Find(&records).Error
 	if err != nil {
 		utils.ErrorCtx(c, "查询用户充电记录失败: %v", err)
 		return nil, err
@@ -244,12 +256,22 @@ func GetRecentRecordsWithTimeslotByUser(c *gin.Context, userID uint, limit int) 
 		if r.ReservationID != 0 {
 			timeslot = reservations[r.ReservationID]
 		}
-		resp = append(resp, map[string]interface{}{
+		result := map[string]interface{}{
 			"date":     r.Date.Format("2006-01-02"),
 			"kwh":      r.KWH,
 			"amount":   r.Amount,
 			"timeslot": timeslot,
-		})
+		}
+
+		// 添加车牌号信息
+		if r.LicensePlate != nil {
+			result["license_plate"] = map[string]interface{}{
+				"id":           r.LicensePlate.ID,
+				"plate_number": r.LicensePlate.PlateNumber,
+			}
+		}
+
+		resp = append(resp, result)
 	}
 	utils.InfoCtx(c, "查询用户充电记录成功: user_id=%d, count=%d", userID, len(records))
 	return resp, nil
@@ -321,6 +343,7 @@ func GetRecordsByMonth(userID uint, month string) ([]map[string]interface{}, err
 
 	var records []models.Record
 	err = models.DB.Where("user_id = ? AND date >= ? AND date <= ?", userID, startDate, endDate).
+		Preload("LicensePlate").
 		Order("date DESC, created_at DESC").
 		Find(&records).Error
 	if err != nil {
@@ -330,7 +353,7 @@ func GetRecordsByMonth(userID uint, month string) ([]map[string]interface{}, err
 	// 组装返回数据
 	var resp []map[string]interface{}
 	for _, record := range records {
-		resp = append(resp, map[string]interface{}{
+		result := map[string]interface{}{
 			"id":         record.ID,
 			"date":       record.Date.Format("2006-01-02"),
 			"timeslot":   record.Timeslot,
@@ -340,7 +363,17 @@ func GetRecordsByMonth(userID uint, month string) ([]map[string]interface{}, err
 			"image_url":  record.ImageURL,
 			"created_at": record.CreatedAt,
 			"updated_at": record.UpdatedAt,
-		})
+		}
+
+		// 添加车牌号信息
+		if record.LicensePlate != nil {
+			result["license_plate"] = map[string]interface{}{
+				"id":           record.LicensePlate.ID,
+				"plate_number": record.LicensePlate.PlateNumber,
+			}
+		}
+
+		resp = append(resp, result)
 	}
 
 	return resp, nil
@@ -349,12 +382,12 @@ func GetRecordsByMonth(userID uint, month string) ([]map[string]interface{}, err
 // GetRecordByID 根据ID获取充电记录详情
 func GetRecordByID(userID uint, recordID string) (map[string]interface{}, error) {
 	var record models.Record
-	err := models.DB.Where("id = ? AND user_id = ?", recordID, userID).First(&record).Error
+	err := models.DB.Where("id = ? AND user_id = ?", recordID, userID).Preload("LicensePlate").First(&record).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"id":         record.ID,
 		"date":       record.Date.Format("2006-01-02"),
 		"timeslot":   record.Timeslot,
@@ -364,7 +397,17 @@ func GetRecordByID(userID uint, recordID string) (map[string]interface{}, error)
 		"image_url":  record.ImageURL,
 		"created_at": record.CreatedAt,
 		"updated_at": record.UpdatedAt,
-	}, nil
+	}
+
+	// 添加车牌号信息
+	if record.LicensePlate != nil {
+		result["license_plate"] = map[string]interface{}{
+			"id":           record.LicensePlate.ID,
+			"plate_number": record.LicensePlate.PlateNumber,
+		}
+	}
+
+	return result, nil
 }
 
 // UpdateRecordByID 根据ID更新充电记录
@@ -373,6 +416,15 @@ func UpdateRecordByID(userID uint, recordID string, req UpdateRecordRequest) (ma
 	err := models.DB.Where("id = ? AND user_id = ?", recordID, userID).First(&record).Error
 	if err != nil {
 		return nil, err
+	}
+
+	// 验证车牌号是否属于当前用户
+	if req.LicensePlateID != nil {
+		var licensePlate models.LicensePlate
+		err := models.DB.Where("id = ? AND user_id = ?", *req.LicensePlateID, userID).First(&licensePlate).Error
+		if err != nil {
+			return nil, errors.New("车牌号不存在或不属于当前用户")
+		}
 	}
 
 	// 更新记录
@@ -385,6 +437,11 @@ func UpdateRecordByID(userID uint, recordID string, req UpdateRecordRequest) (ma
 	// 如果提供了新的图片URL，则更新
 	if req.ImageURL != "" {
 		updates["image_url"] = req.ImageURL
+	}
+
+	// 更新车牌号
+	if req.LicensePlateID != nil {
+		updates["license_plate_id"] = req.LicensePlateID
 	}
 
 	// 重新计算费用
@@ -413,7 +470,8 @@ func UpdateRecordByID(userID uint, recordID string, req UpdateRecordRequest) (ma
 
 // UpdateRecordRequest 更新充电记录请求结构
 type UpdateRecordRequest struct {
-	KWH      float64 `json:"kwh"`
-	ImageURL string  `json:"image_url"`
-	Remark   string  `json:"remark"`
+	KWH            float64 `json:"kwh"`
+	ImageURL       string  `json:"image_url"`
+	Remark         string  `json:"remark"`
+	LicensePlateID *uint   `json:"license_plate_id"`
 }

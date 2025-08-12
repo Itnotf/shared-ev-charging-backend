@@ -8,18 +8,20 @@ import (
 
 // Reservation 预约表
 type Reservation struct {
-	ID        uint           `json:"id" gorm:"primaryKey"`
-	UserID    uint           `json:"user_id" gorm:"not null;comment:用户ID"`
-	Date      time.Time      `json:"date" gorm:"type:date;not null;comment:预约日期(无时区)"`
-	Timeslot  string         `json:"timeslot" gorm:"size:20;not null;comment:时段:day,night"`
-	Status    string         `json:"status" gorm:"size:20;default:'pending';comment:状态:pending,confirmed,cancelled,completed"`
-	Remark    string         `json:"remark" gorm:"size:255;comment:备注"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `json:"deleted_at" gorm:"index" swaggerignore:"true"`
+	ID             uint           `json:"id" gorm:"primaryKey"`
+	UserID         uint           `json:"user_id" gorm:"not null;comment:用户ID"`
+	Date           time.Time      `json:"date" gorm:"type:date;not null;comment:预约日期(无时区)"`
+	Timeslot       string         `json:"timeslot" gorm:"size:20;not null;comment:时段:day,night"`
+	Status         string         `json:"status" gorm:"size:20;default:'pending';comment:状态:pending,confirmed,cancelled,completed"`
+	Remark         string         `json:"remark" gorm:"size:255;comment:备注"`
+	LicensePlateID *uint          `json:"license_plate_id" gorm:"comment:关联的车牌号ID"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	DeletedAt      gorm.DeletedAt `json:"deleted_at" gorm:"index" swaggerignore:"true"`
 
 	// 关联关系
-	User User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	User         User          `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	LicensePlate *LicensePlate `json:"license_plate,omitempty" gorm:"foreignKey:LicensePlateID"`
 }
 
 // TableName 指定表名
@@ -56,7 +58,7 @@ func (r *Reservation) IsCompleted() bool {
 
 // FormatReservationInfo 格式化预约信息
 func (r *Reservation) FormatReservationInfo() map[string]interface{} {
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"id":            r.ID,
 		"user_id":       r.UserID,
 		"date":          r.Date.Format("2006-01-02"),
@@ -69,4 +71,14 @@ func (r *Reservation) FormatReservationInfo() map[string]interface{} {
 		"user_name":     r.User.Name,
 		"user_avatar":   r.User.Avatar,
 	}
+
+	// 添加车牌号信息
+	if r.LicensePlate != nil {
+		result["license_plate"] = map[string]interface{}{
+			"id":           r.LicensePlate.ID,
+			"plate_number": r.LicensePlate.PlateNumber,
+		}
+	}
+
+	return result
 }
